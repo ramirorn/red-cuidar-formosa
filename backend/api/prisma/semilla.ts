@@ -7,24 +7,29 @@ import { PrismaClient, type NivelRiesgo } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
-const LOCALIDADES: { nombre: string; nivelRiesgoBase: NivelRiesgo }[] = [
-    { nombre: "Formosa Capital", nivelRiesgoBase: "CRITICO" },
-    { nombre: "Clorinda", nivelRiesgoBase: "CRITICO" },
-    { nombre: "Pirané", nivelRiesgoBase: "ALTO" },
-    { nombre: "El Colorado", nivelRiesgoBase: "ALTO" },
-    { nombre: "Laguna Blanca", nivelRiesgoBase: "ALTO" },
-    { nombre: "Las Lomitas", nivelRiesgoBase: "MODERADO_ALTO" },
-    { nombre: "Palo Santo", nivelRiesgoBase: "MODERADO_ALTO" },
-    { nombre: "Estanislao del Campo", nivelRiesgoBase: "MODERADO_ALTO" },
+// Coordenadas aproximadas del centro de cada localidad: solo se usan para consultar el clima.
+const LOCALIDADES: { nombre: string; nivelRiesgoBase: NivelRiesgo; latitud: number; longitud: number }[] = [
+    { nombre: "Formosa Capital", nivelRiesgoBase: "CRITICO", latitud: -26.1849, longitud: -58.1731 },
+    { nombre: "Clorinda", nivelRiesgoBase: "CRITICO", latitud: -25.2848, longitud: -57.7185 },
+    { nombre: "Pirané", nivelRiesgoBase: "ALTO", latitud: -25.7324, longitud: -59.1088 },
+    { nombre: "El Colorado", nivelRiesgoBase: "ALTO", latitud: -26.3081, longitud: -59.3728 },
+    { nombre: "Laguna Blanca", nivelRiesgoBase: "ALTO", latitud: -25.1289, longitud: -58.2487 },
+    { nombre: "Las Lomitas", nivelRiesgoBase: "MODERADO_ALTO", latitud: -24.7096, longitud: -60.5936 },
+    { nombre: "Palo Santo", nivelRiesgoBase: "MODERADO_ALTO", latitud: -25.5633, longitud: -59.3378 },
+    { nombre: "Estanislao del Campo", nivelRiesgoBase: "MODERADO_ALTO", latitud: -25.0547, longitud: -60.0937 },
 ];
 
 const crearLocalidades = async () => {
-    for (const localidad of LOCALIDADES) {
-        await prisma.localidad.upsert({
+    for (const { latitud, longitud, ...localidad } of LOCALIDADES) {
+        const registro = await prisma.localidad.upsert({
             where: { nombre: localidad.nombre },
             create: localidad,
             update: { nivelRiesgoBase: localidad.nivelRiesgoBase },
         });
+        await prisma.$executeRaw`
+            UPDATE "localidad" SET "centroide" = ST_SetSRID(ST_MakePoint(${longitud}::float8, ${latitud}::float8), 4326)
+            WHERE "id" = ${registro.id}
+        `;
     }
     console.log(`Localidades cargadas: ${LOCALIDADES.length}`);
 };

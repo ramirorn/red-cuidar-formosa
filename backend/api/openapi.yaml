@@ -231,6 +231,84 @@ paths:
                       data: { $ref: '#/components/schemas/ColeccionGeoJson' }
         '400': { $ref: '#/components/responses/SolicitudInvalida' }
 
+  /suscripciones-push/clave-publica:
+    get:
+      operationId: obtenerClavePublicaPush
+      summary: Clave pública VAPID para suscribirse a Web Push
+      tags: [Ciudadanía]
+      security: []
+      responses:
+        '200':
+          description: Clave pública (base64url) para `PushManager.subscribe`
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Exito'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          clavePublica: { type: string }
+        '503': { $ref: '#/components/responses/NoDisponible' }
+
+  /chat/mensajes:
+    post:
+      operationId: enviarMensajeChat
+      summary: Conversa con el asistente "IA Mosquito"
+      description: |
+        La API reenvía el mensaje al orquestador (n8n + LLM local). El historial lo guarda la PWA
+        y el servidor no persiste el contenido; solo registra el nivel de triaje.
+        Límite: 20 mensajes cada 5 minutos por sesión. El asistente orienta pero no reemplaza la consulta médica.
+      tags: [Ciudadanía]
+      security:
+        - sesionAnonima: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mensaje]
+              properties:
+                mensaje: { type: string, minLength: 1, maxLength: 1000 }
+                historial:
+                  type: array
+                  maxItems: 10
+                  items:
+                    type: object
+                    required: [rol, contenido]
+                    properties:
+                      rol: { type: string, enum: [usuario, asistente] }
+                      contenido: { type: string, maxLength: 1000 }
+      responses:
+        '200':
+          description: Respuesta del asistente
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Exito'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          respuesta: { type: string }
+                          nivelTriaje:
+                            type: [string, 'null']
+                            enum: [SIN_RIESGO, LEVE, MODERADO, URGENTE, null]
+        '400': { $ref: '#/components/responses/SolicitudInvalida' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '429': { $ref: '#/components/responses/DemasiadasSolicitudes' }
+        '502':
+          description: El asistente respondió con un error
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '503': { $ref: '#/components/responses/NoDisponible' }
+
   /suscripciones-push:
     post:
       operationId: guardarSuscripcion
@@ -921,6 +999,50 @@ paths:
                           revisadas: { type: integer }
                           actualizadas: { type: integer }
         '401': { $ref: '#/components/responses/NoAutenticado' }
+
+  /interno/notificaciones/lluvia:
+    post:
+      operationId: enviarAlertaLluvia
+      summary: Envía la alerta Web Push post-lluvia a una localidad
+      description: |
+        Como máximo una alerta cada 12 horas por localidad; si ya se envió, responde `omitida: true`.
+        Desactiva las suscripciones que el servicio push informa como vencidas (404/410).
+      tags: [Interno]
+      security:
+        - servicioInterno: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [localidadId, precipitacionMm]
+              properties:
+                localidadId: { type: integer, minimum: 1 }
+                precipitacionMm: { type: number, minimum: 0 }
+      responses:
+        '200':
+          description: Resultado del envío
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Exito'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          omitida: { type: boolean }
+                          motivo: { type: string }
+                          notificacionId: { type: integer }
+                          enviadas: { type: integer }
+                          fallidas: { type: integer }
+                          bajas: { type: integer }
+        '400': { $ref: '#/components/responses/SolicitudInvalida' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '503': { $ref: '#/components/responses/NoDisponible' }
 
 components:
   securitySchemes:

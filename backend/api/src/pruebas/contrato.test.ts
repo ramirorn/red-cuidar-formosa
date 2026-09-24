@@ -14,6 +14,7 @@ vi.mock('../config/prisma.js', () => ({
 }));
 
 const { default: app } = await import('../app.js');
+const { MONTAJES } = await import('../routes/index.js');
 
 const contrato = parse(readFileSync(new URL('../../openapi.yaml', import.meta.url), 'utf8'));
 const METODOS = ['get', 'post', 'patch', 'put', 'delete'] as const;
@@ -57,6 +58,24 @@ describe('contrato OpenAPI', () => {
     it.each(operaciones)('$metodo $ruta existe en la API', async ({ metodo, url }) => {
         const respuesta = await pedir(metodo, url);
         expect(respuesta.body?.message).not.toBe('Ruta no encontrada');
+    });
+
+    it('documenta cada ruta que expone la API', () => {
+        const documentadas = new Set(operaciones.map(({ metodo, ruta }) => `${metodo} ${ruta}`));
+        const faltantes: string[] = [];
+
+        for (const { prefijo, router } of MONTAJES) {
+            for (const capa of router.stack as unknown as { route?: { path: string; methods: Record<string, boolean> } }[]) {
+                if (!capa.route) continue;
+                const sufijo = capa.route.path === '/' ? '' : capa.route.path;
+                const ruta = `${prefijo}${sufijo}`.replace(/:(\w+)/g, '{$1}');
+                for (const metodo of Object.keys(capa.route.methods)) {
+                    if (!documentadas.has(`${metodo} ${ruta}`)) faltantes.push(`${metodo.toUpperCase()} ${ruta}`);
+                }
+            }
+        }
+
+        expect(faltantes).toEqual([]);
     });
 
     it('publica el contrato fuera de producción', async () => {

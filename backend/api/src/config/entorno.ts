@@ -42,6 +42,12 @@ const entorno = {
     DIR_EVIDENCIAS: process.env.DIR_EVIDENCIAS ?? "./almacenamiento/evidencias",
     REDIS_URL: process.env.REDIS_URL ?? "",
     URL_MOTOR_PREDICTIVO: process.env.URL_MOTOR_PREDICTIVO ?? "http://localhost:8000",
+    // Webhook del flujo de chat en n8n (IA Mosquito).
+    URL_CHAT_ORQUESTADOR: process.env.URL_CHAT_ORQUESTADOR ?? "http://localhost:5678/webhook/chat-mosquito",
+    // Claves VAPID de Web Push (npm run generar-vapid). Sin ellas, las notificaciones quedan desactivadas.
+    VAPID_CLAVE_PUBLICA: process.env.VAPID_CLAVE_PUBLICA ?? "",
+    VAPID_CLAVE_PRIVADA: process.env.VAPID_CLAVE_PRIVADA ?? "",
+    VAPID_CONTACTO: process.env.VAPID_CONTACTO ?? "mailto:salud@redcuidar.local",
     // Recuadro aproximado de la provincia de Formosa: descarta coordenadas fuera del territorio.
     LIMITES_PROVINCIA: {
         latitudMinima: numero("LATITUD_MINIMA", -27.0),

@@ -10,7 +10,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "semilla": "tsx prisma/semilla.ts",
-    "importar-manzanas": "tsx prisma/importarManzanas.ts"
+    "importar-manzanas": "tsx prisma/importarManzanas.ts",
+    "generar-vapid": "web-push generate-vapid-keys"
   },
   "keywords": [],
   "author": "",
@@ -30,7 +31,8 @@
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.4.0",
     "redis": "^6.2.1",
-    "sharp": "^0.35.4"
+    "sharp": "^0.35.4",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.10",
@@ -40,6 +42,7 @@
     "@types/multer": "^2.2.0",
     "@types/node": "^26.6.2",
     "@types/supertest": "^7.2.1",
+    "@types/web-push": "^3.6.4",
     "prisma": "^5.22.0",
     "supertest": "^7.3.0",
     "tsx": "^4.23.15",

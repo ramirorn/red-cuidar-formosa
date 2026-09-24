@@ -86,6 +86,10 @@ enum EstadoRuta {
   CANCELADA
 }
 
+enum TipoNotificacion {
+  ALERTA_LLUVIA
+}
+
 enum NivelTriaje {
   SIN_RIESGO
   LEVE
@@ -102,12 +106,15 @@ model localidad {
   nombre          String                                       @unique
   nivelRiesgoBase NivelRiesgo
   geom            Unsupported("geometry(MultiPolygon, 4326)")?
+  // Punto de referencia para consultar el clima de la localidad.
+  centroide       Unsupported("geometry(Point, 4326)")?
 
   manzanas                manzana[]
   usuarios                usuario[]
   registrosMeteorologicos registroMeteorologico[]
   rutas                   rutaBrigada[]
   suscripciones           suscripcionPush[]
+  notificaciones          notificacionEnviada[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -265,6 +272,24 @@ model suscripcionPush {
   updatedAt DateTime @updatedAt
 
   @@index([localidadId, activa])
+}
+
+// Registro de cada envío masivo de Web Push: evita repetir la misma alerta y deja constancia del alcance.
+model notificacionEnviada {
+  id              Int              @id @default(autoincrement())
+  tipo            TipoNotificacion
+  localidadId     Int
+  titulo          String           @db.VarChar(120)
+  precipitacionMm Float?
+  enviadas        Int              @default(0)
+  fallidas        Int              @default(0)
+  bajas           Int              @default(0)
+
+  localidad localidad @relation(fields: [localidadId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([localidadId, tipo, createdAt])
 }
 
 // Del chat solo se conserva el nivel de triaje; los mensajes no se persisten aquí.

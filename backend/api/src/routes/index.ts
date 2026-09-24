@@ -3,23 +3,32 @@ import sesionRouter from "./sesion.routes.js";
 import reporteRouter from "./reporte.routes.js";
 import manzanaRouter from "./manzana.routes.js";
 import suscripcionRouter from "./suscripcion.routes.js";
+import chatRouter from "./chat.routes.js";
 import authRouter from "./auth.routes.js";
 import institucionalRouter from "./institucional.routes.js";
 import internoRouter from "./interno.routes.js";
 
+// Se exporta para que la prueba de contrato verifique que cada ruta esté documentada en OpenAPI.
+export const MONTAJES: { prefijo: string; router: Router }[] = [
+    // API de Recepción de Evidencia y Sincronización (ciudadanía anónima)
+    { prefijo: "/sesiones", router: sesionRouter },
+    { prefijo: "/reportes", router: reporteRouter },
+    { prefijo: "/manzanas", router: manzanaRouter },
+    { prefijo: "/suscripciones-push", router: suscripcionRouter },
+    { prefijo: "/chat", router: chatRouter },
+
+    // API Core del Dashboard Institucional
+    { prefijo: "/auth", router: authRouter },
+    { prefijo: "/institucional", router: institucionalRouter },
+
+    // Servicios internos
+    { prefijo: "/interno", router: internoRouter },
+];
+
 const router = Router();
 
-// API de Recepción de Evidencia y Sincronización (ciudadanía anónima)
-router.use("/sesiones", sesionRouter);
-router.use("/reportes", reporteRouter);
-router.use("/manzanas", manzanaRouter);
-router.use("/suscripciones-push", suscripcionRouter);
-
-// API Core del Dashboard Institucional
-router.use("/auth", authRouter);
-router.use("/institucional", institucionalRouter);
-
-// Servicios internos
-router.use("/interno", internoRouter);
+for (const { prefijo, router: subrouter } of MONTAJES) {
+    router.use(prefijo, subrouter);
+}
 
 export default router;

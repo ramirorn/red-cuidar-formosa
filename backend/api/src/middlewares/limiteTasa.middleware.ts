@@ -22,4 +22,6 @@ const crearLimite = (ventanaMs: number, limite: number, porSesion = false) => ra
 export const limiteGeneral = crearLimite(60 * 1000, 300);
 export const limiteCreacionSesiones = crearLimite(60 * 60 * 1000, 20);
 export const limiteReportes = crearLimite(15 * 60 * 1000, 30, true);
+// El LLM es costoso: pocos mensajes por sesión.
+export const limiteChat = crearLimite(5 * 60 * 1000, 20, true);
 export const limiteLogin = crearLimite(15 * 60 * 1000, 10);
