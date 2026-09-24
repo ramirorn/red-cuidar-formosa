@@ -1,0 +1,440 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [postgis]
+}
+
+// Las columnas geoespaciales se declaran como Unsupported porque Prisma no
+// maneja tipos PostGIS: se leen y escriben con $queryRaw parametrizado.
+
+// ---------------------------------------------------------------------------
+// Enumeraciones
+// ---------------------------------------------------------------------------
+
+enum NivelRiesgo {
+  CRITICO
+  ALTO
+  MODERADO_ALTO
+  MODERADO
+}
+
+enum EstadoManzana {
+  SIN_DATOS
+  VERDE
+  AMARILLO
+  ROJO
+}
+
+enum TipoReporte {
+  CRIADERO
+  MICROBASURAL
+  LIMPIEZA
+}
+
+enum OrigenReporte {
+  PWA
+  CHAT
+}
+
+enum EstadoReporte {
+  PENDIENTE
+  VALIDADO
+  RECHAZADO
+  RESUELTO
+}
+
+enum ClaseObjeto {
+  NEUMATICO
+  BOTELLA
+  BALDE
+  MACETA
+  TANQUE
+  BEBEDERO
+  FLORERO
+  OTRO
+}
+
+enum MomentoEvidencia {
+  ANTES
+  DESPUES
+}
+
+enum Rol {
+  ADMINISTRADOR
+  EPIDEMIOLOGO
+  COORDINADOR_BRIGADA
+  BRIGADISTA
+  AUDITOR
+}
+
+enum TipoIntervencion {
+  APLICACION_BTI
+  FUMIGACION
+  DESCACHARRADO
+  INSPECCION
+}
+
+enum EstadoRuta {
+  PLANIFICADA
+  EN_CURSO
+  FINALIZADA
+  CANCELADA
+}
+
+enum NivelTriaje {
+  SIN_RIESGO
+  LEVE
+  MODERADO
+  URGENTE
+}
+
+// ---------------------------------------------------------------------------
+// Territorio
+// ---------------------------------------------------------------------------
+
+model localidad {
+  id              Int                                          @id @default(autoincrement())
+  nombre          String                                       @unique
+  nivelRiesgoBase NivelRiesgo
+  geom            Unsupported("geometry(MultiPolygon, 4326)")?
+
+  manzanas                manzana[]
+  usuarios                usuario[]
+  registrosMeteorologicos registroMeteorologico[]
+  rutas                   rutaBrigada[]
+  suscripciones           suscripcionPush[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([geom], type: Gist)
+}
+
+model manzana {
+  id                  Int                                    @id @default(autoincrement())
+  localidadId         Int
+  codigo              String
+  geom                Unsupported("geometry(Polygon, 4326)")
+  centroide           Unsupported("geometry(Point, 4326)")
+  estado              EstadoManzana                          @default(SIN_DATOS)
+  estadoActualizadoEn DateTime?
+  ultimoReporteEn     DateTime?
+  ultimaLimpiezaEn    DateTime?
+
+  localidad      localidad                @relation(fields: [localidadId], references: [id])
+  reportes       reporte[]
+  historial      historialEstadoManzana[]
+  intervenciones intervencion[]
+  paradas        paradaRuta[]
+  predicciones   prediccionRiesgo[]
+  suscripciones  suscripcionPush[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([localidadId, codigo])
+  @@index([localidadId, estado])
+  @@index([geom], type: Gist)
+  @@index([centroide], type: Gist)
+}
+
+model historialEstadoManzana {
+  id             Int           @id @default(autoincrement())
+  manzanaId      Int
+  estadoAnterior EstadoManzana
+  estadoNuevo    EstadoManzana
+  motivo         String        @db.VarChar(200)
+  reporteId      String?       @db.Uuid
+  intervencionId String?       @db.Uuid
+  usuarioId      Int?
+
+  manzana manzana @relation(fields: [manzanaId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([manzanaId, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Ciudadanía anónima y evidencia
+// ---------------------------------------------------------------------------
+
+model sesionAnonima {
+  id                String   @id @default(uuid()) @db.Uuid
+  ultimaActividadEn DateTime @default(now())
+
+  reportes      reporte[]
+  suscripciones suscripcionPush[]
+  triajes       triajeChat[]
+
+  createdAt DateTime @default(now())
+
+  @@index([ultimaActividadEn])
+}
+
+model reporte {
+  id                String                                @id @default(uuid()) @db.Uuid
+  // Identificador generado por la PWA: hace idempotentes los reintentos del Background Sync.
+  idCliente         String                                @db.Uuid
+  sesionId          String?                               @db.Uuid
+  manzanaId         Int?
+  tipo              TipoReporte
+  origen            OrigenReporte                         @default(PWA)
+  estado            EstadoReporte                         @default(PENDIENTE)
+  ubicacion         Unsupported("geography(Point, 4326)")
+  precisionGpsM     Float?
+  confianzaIa       Float?
+  descripcion       String?                               @db.VarChar(500)
+  reporteResueltoId String?                               @db.Uuid
+  capturadoEn       DateTime
+  validadoPorId     Int?
+  validadoEn        DateTime?
+  motivoRechazo     String?                               @db.VarChar(300)
+
+  sesion           sesionAnonima? @relation(fields: [sesionId], references: [id], onDelete: SetNull)
+  manzana          manzana?       @relation(fields: [manzanaId], references: [id])
+  reporteResuelto  reporte?       @relation("ReporteResuelto", fields: [reporteResueltoId], references: [id], onDelete: SetNull)
+  reportesDeCierre reporte[]      @relation("ReporteResuelto")
+  validadoPor      usuario?       @relation(fields: [validadoPorId], references: [id])
+  detecciones      deteccionIa[]
+  evidencias       evidencia[]
+  intervenciones   intervencion[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([sesionId, idCliente])
+  @@index([manzanaId, capturadoEn])
+  @@index([estado, createdAt])
+  @@index([createdAt, id])
+  @@index([ubicacion], type: Gist)
+}
+
+model deteccionIa {
+  id               Int         @id @default(autoincrement())
+  reporteId        String      @db.Uuid
+  clase            ClaseObjeto
+  confianza        Float
+  // Caja normalizada (0 a 1) sobre la imagen: { x, y, ancho, alto }.
+  cajaDelimitadora Json
+
+  reporte reporte @relation(fields: [reporteId], references: [id], onDelete: Cascade)
+
+  @@index([reporteId])
+}
+
+model evidencia {
+  id                 String           @id @default(uuid()) @db.Uuid
+  reporteId          String           @db.Uuid
+  rutaAlmacenamiento String           @unique
+  mime               String           @db.VarChar(50)
+  tamanoBytes        Int
+  // Hash del archivo original: impide reutilizar la misma foto en otro reporte.
+  sha256             String           @unique @db.Char(64)
+  ancho              Int
+  alto               Int
+  momento            MomentoEvidencia
+
+  reporte reporte @relation(fields: [reporteId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([reporteId])
+}
+
+model suscripcionPush {
+  id          Int     @id @default(autoincrement())
+  sesionId    String  @db.Uuid
+  endpoint    String  @unique @db.VarChar(1000)
+  p256dh      String  @db.VarChar(200)
+  auth        String  @db.VarChar(100)
+  localidadId Int?
+  manzanaId   Int?
+  activa      Boolean @default(true)
+
+  sesion    sesionAnonima @relation(fields: [sesionId], references: [id], onDelete: Cascade)
+  localidad localidad?    @relation(fields: [localidadId], references: [id])
+  manzana   manzana?      @relation(fields: [manzanaId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([localidadId, activa])
+}
+
+// Del chat solo se conserva el nivel de triaje; los mensajes no se persisten aquí.
+model triajeChat {
+  id       Int         @id @default(autoincrement())
+  sesionId String      @db.Uuid
+  nivel    NivelTriaje
+
+  sesion sesionAnonima @relation(fields: [sesionId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Personal institucional
+// ---------------------------------------------------------------------------
+
+model usuario {
+  id             Int       @id @default(autoincrement())
+  nombre         String
+  apellido       String
+  email          String    @unique
+  password       String
+  rol            Rol
+  // Alcance territorial: obligatorio para COORDINADOR_BRIGADA y BRIGADISTA.
+  localidadId    Int?
+  activo         Boolean   @default(true)
+  ultimoAccesoEn DateTime?
+  eliminadoEn    DateTime?
+
+  localidad         localidad?        @relation(fields: [localidadId], references: [id])
+  tokensRefresco    tokenRefresco[]
+  reportesValidados reporte[]
+  intervenciones    intervencion[]
+  rutasCoordinadas  rutaBrigada[]     @relation("Coordinador")
+  rutasAsignadas    rutaBrigada[]     @relation("Brigadista")
+  auditorias        auditoriaAcceso[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([rol, localidadId])
+}
+
+model tokenRefresco {
+  id         Int       @id @default(autoincrement())
+  usuarioId  Int
+  hashToken  String    @unique @db.Char(64)
+  expiraEn   DateTime
+  revocadoEn DateTime?
+  ip         String?   @db.VarChar(64)
+  userAgent  String?   @db.VarChar(300)
+
+  usuario usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([usuarioId])
+}
+
+model auditoriaAcceso {
+  id        Int     @id @default(autoincrement())
+  usuarioId Int
+  accion    String  @db.VarChar(60)
+  recurso   String  @db.VarChar(200)
+  filtros   Json?
+  ip        String? @db.VarChar(64)
+
+  usuario usuario @relation(fields: [usuarioId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([usuarioId, createdAt])
+  @@index([accion, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Operativos de campo
+// ---------------------------------------------------------------------------
+
+model intervencion {
+  id               String                                 @id @default(uuid()) @db.Uuid
+  tipo             TipoIntervencion
+  manzanaId        Int
+  usuarioId        Int
+  reporteId        String?                                @db.Uuid
+  paradaRutaId     Int?
+  realizadaEn      DateTime
+  ubicacion        Unsupported("geography(Point, 4326)")?
+  cantidadProducto Float?
+  unidadProducto   String?                                @db.VarChar(20)
+  tipoCuerpoAgua   String?                                @db.VarChar(100)
+  observaciones    String?                                @db.VarChar(500)
+
+  manzana    manzana     @relation(fields: [manzanaId], references: [id])
+  usuario    usuario     @relation(fields: [usuarioId], references: [id])
+  reporte    reporte?    @relation(fields: [reporteId], references: [id], onDelete: SetNull)
+  paradaRuta paradaRuta? @relation(fields: [paradaRutaId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([manzanaId, realizadaEn])
+  @@index([tipo, realizadaEn])
+  @@index([ubicacion], type: Gist)
+}
+
+model rutaBrigada {
+  id            Int        @id @default(autoincrement())
+  localidadId   Int
+  coordinadorId Int
+  brigadistaId  Int?
+  fecha         DateTime   @db.Date
+  estado        EstadoRuta @default(PLANIFICADA)
+
+  localidad   localidad    @relation(fields: [localidadId], references: [id])
+  coordinador usuario      @relation("Coordinador", fields: [coordinadorId], references: [id])
+  brigadista  usuario?     @relation("Brigadista", fields: [brigadistaId], references: [id])
+  paradas     paradaRuta[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([localidadId, fecha])
+}
+
+model paradaRuta {
+  id         Int       @id @default(autoincrement())
+  rutaId     Int
+  manzanaId  Int
+  orden      Int
+  visitadaEn DateTime?
+
+  ruta           rutaBrigada    @relation(fields: [rutaId], references: [id], onDelete: Cascade)
+  manzana        manzana        @relation(fields: [manzanaId], references: [id])
+  intervenciones intervencion[]
+
+  @@unique([rutaId, orden])
+}
+
+// ---------------------------------------------------------------------------
+// Clima y predicción
+// ---------------------------------------------------------------------------
+
+model registroMeteorologico {
+  id              Int      @id @default(autoincrement())
+  localidadId     Int
+  observadoEn     DateTime
+  precipitacionMm Float
+  temperaturaC    Float?
+  humedadRelativa Float?
+  esPronostico    Boolean  @default(false)
+  fuente          String   @db.VarChar(50)
+
+  localidad localidad @relation(fields: [localidadId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@unique([localidadId, observadoEn, esPronostico, fuente])
+}
+
+model prediccionRiesgo {
+  id           Int      @id @default(autoincrement())
+  manzanaId    Int
+  indiceRiesgo Float
+  calculadoEn  DateTime @default(now())
+  vigenteHasta DateTime
+
+  manzana manzana @relation(fields: [manzanaId], references: [id], onDelete: Cascade)
+
+  @@index([manzanaId, calculadoEn])
+}
