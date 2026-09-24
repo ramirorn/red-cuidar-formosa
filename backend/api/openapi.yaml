@@ -801,6 +801,38 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
         '503': { $ref: '#/components/responses/NoDisponible' }
 
+  /institucional/predicciones:
+    get:
+      operationId: obtenerPredicciones
+      summary: Riesgo esperado para las próximas 72 horas
+      description: |
+        Última predicción vigente de cada manzana, calculada por el motor con la lluvia pronosticada.
+        Permiso `mapa_calor:leer`. Se recalcula cada hora, cuando n8n actualiza el clima.
+      tags: [Métricas]
+      security:
+        - institucional: []
+      parameters:
+        - $ref: '#/components/parameters/LocalidadId'
+      responses:
+        '200':
+          description: FeatureCollection de puntos con `indiceRiesgoPredicho` entre 0 y 1
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Exito'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/ColeccionGeoJson' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '502':
+          description: El motor predictivo devolvió un error
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '503': { $ref: '#/components/responses/NoDisponible' }
+
   /institucional/exportaciones/reportes:
     get:
       operationId: exportarReportes

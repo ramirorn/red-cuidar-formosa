@@ -9,6 +9,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.config.bd import abrir_pool, cerrar_pool, obtener_pool
 from app.config.cache import cerrar_cache
 from app.routes.mapa_calor_routes import mapa_calor_router
+from app.routes.prediccion_routes import prediccion_router
 
 logging.basicConfig(level=logging.INFO)
 
@@ -50,3 +51,4 @@ async def salud() -> JSONResponse:
 
 
 app.include_router(mapa_calor_router)
+app.include_router(prediccion_router)

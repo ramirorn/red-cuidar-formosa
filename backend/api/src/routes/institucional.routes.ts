@@ -4,7 +4,7 @@ import { listarAuditoria } from "../controllers/auditoria.controllers.js";
 import { obtenerImagenEvidencia } from "../controllers/evidencia.controllers.js";
 import { exportarIntervenciones, exportarReportes } from "../controllers/exportacion.controllers.js";
 import { listarIntervenciones, registrarIntervencion } from "../controllers/intervencion.controllers.js";
-import { obtenerMapaCalor, obtenerMetricas } from "../controllers/metrica.controllers.js";
+import { obtenerMapaCalor, obtenerMetricas, obtenerPredicciones } from "../controllers/metrica.controllers.js";
 import { cambiarEstadoReporte, listarReportes, obtenerReporte } from "../controllers/reporte.controllers.js";
 import { cambiarEstadoRuta, generarRuta, listarRutas, marcarParadaVisitada, obtenerRuta } from "../controllers/ruta.controllers.js";
 import { actualizarUsuario, crearUsuario, listarUsuarios } from "../controllers/usuario.controllers.js";
@@ -14,7 +14,7 @@ import { validarCampos } from "../middlewares/validator.js";
 import { validarListarAuditoria } from "../validators/auditoria.validators.js";
 import { validarIdUuid } from "../validators/comun.validators.js";
 import { validarListarIntervenciones, validarRegistrarIntervencion } from "../validators/intervencion.validators.js";
-import { validarConsultaAgregada } from "../validators/metrica.validators.js";
+import { validarConsultaAgregada, validarConsultaPredicciones } from "../validators/metrica.validators.js";
 import {
     validarCambiarEstadoReporte,
     validarListarReportes,
@@ -58,6 +58,7 @@ institucionalRouter.patch("/rutas/:id/paradas/:paradaId/visitada", requierePermi
 // Métricas epidemiológicas y mapa de calor
 institucionalRouter.get("/metricas", requierePermiso(PERMISOS.METRICAS_LEER), validarConsultaAgregada, validarCampos, obtenerMetricas);
 institucionalRouter.get("/mapa-calor", requierePermiso(PERMISOS.MAPA_CALOR_LEER), validarConsultaAgregada, validarCampos, obtenerMapaCalor);
+institucionalRouter.get("/predicciones", requierePermiso(PERMISOS.MAPA_CALOR_LEER), validarConsultaPredicciones, validarCampos, obtenerPredicciones);
 
 // Exportaciones CSV (auditadas)
 institucionalRouter.get("/exportaciones/reportes", requierePermiso(PERMISOS.EXPORTACIONES_DESCARGAR), validarConsultaAgregada, validarCampos, exportarReportes);

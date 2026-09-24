@@ -8,7 +8,7 @@ anónima y el personal de salud los gestiona desde un dashboard institucional.
 | Carpeta | Servicio | Tecnología | Expuesto |
 |---|---|---|---|
 | `api/` | API de Recepción de Evidencia + API Core del Dashboard Institucional | Node 22, Express 5, Prisma 5, TypeScript | `:3000` |
-| `motor-predictivo/` | Mapa de calor e índice de riesgo | Python 3.12, FastAPI, asyncpg | No (red interna) |
+| `motor-predictivo/` | Mapa de calor, índice de riesgo y predicción a 72 h | Python 3.12, FastAPI, asyncpg | No (red interna) |
 | `orquestador/` | Alertas por clima, chat con LLM, tareas programadas | n8n + Ollama (`nemotron-3-nano:4b`) | `127.0.0.1:5678` |
 | `db/` | Base de datos compartida | PostgreSQL 17 + PostGIS 3.5 | No (red interna) |
 | — | Caché del mapa de calor | Redis 7 | No (red interna) |
@@ -79,6 +79,14 @@ Cada servicio se conecta con su propio rol (privilegio mínimo, ver `db/init` y 
 Un reporte se valida solo si la IA del dispositivo informa una confianza ≥ 0,6; si no, queda PENDIENTE para revisión.
 n8n dispara `POST /api/interno/manzanas/recalcular` después de cada lluvia y una vez por día.
 
+### Índice de riesgo y predicción (motor predictivo)
+
+- **Índice actual (0 a 1):** 50 % criaderos validados (satura en 5), 20 % reportes pendientes (satura en 5)
+  y 30 % lluvia observada en los últimos 7 días (satura en 50 mm). Una manzana en ROJO nunca baja de 0,5.
+  El total se pondera por el riesgo histórico de la localidad (1 para CRITICO, 0,85 para ALTO, 0,7 para MODERADO_ALTO).
+- **Predicción a 72 h:** el mismo índice sumando la lluvia pronosticada, porque vuelve a llenar los recipientes.
+  Se recalcula cada hora cuando n8n actualiza el clima, dura 24 h y se conservan 30 días de historial.
+
 ## Control de acceso (RBAC)
 
 Cada ruta institucional pasa por `verificarToken → requierePermiso(permiso) → validación → controlador`.
@@ -141,7 +149,7 @@ cercano desde el punto de partida. Una intervención registrada con `paradaRutaI
 | GET | `/api/institucional/evidencias/:id/imagen` | `evidencias:ver` |
 | POST / GET | `/api/institucional/intervenciones` | `intervenciones:registrar` / `intervenciones:leer` |
 | GET | `/api/institucional/metricas` | `metricas:leer` |
-| GET | `/api/institucional/mapa-calor` | `mapa_calor:leer` |
+| GET | `/api/institucional/mapa-calor` · `/api/institucional/predicciones` | `mapa_calor:leer` |
 | GET | `/api/institucional/exportaciones/reportes` · `/exportaciones/intervenciones` | `exportaciones:descargar` |
 | POST / GET / PATCH | `/api/institucional/usuarios` | `usuarios:gestionar` |
 | POST / GET | `/api/institucional/rutas` · GET `/rutas/:id` | `rutas:gestionar` / `rutas:leer` |

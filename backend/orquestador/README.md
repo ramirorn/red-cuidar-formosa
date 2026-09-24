@@ -27,6 +27,7 @@ Si se edita un flujo desde la interfaz (http://localhost:5678), hay que exportar
 | `URL_API` | API Node dentro de la red de Docker (`http://api:3000/api`). |
 | `URL_API_CLIMA` | Open-Meteo (`https://api.open-meteo.com`, sin clave). |
 | `URL_OLLAMA` / `MODELO_OLLAMA` | LLM local (`nemotron-3-nano:4b`), por defecto en la computadora anfitriona. |
+| `URL_MOTOR_PREDICTIVO` | Motor predictivo dentro de la red interna. |
 
 ## Flujos
 
@@ -40,6 +41,7 @@ Si se edita un flujo desde la interfaz (http://localhost:5678), hay que exportar
    - `POST /api/interno/manzanas/recalcular`: las manzanas limpiadas antes de la lluvia pasan a AMARILLO.
    - `POST /api/interno/notificaciones/lluvia`: Web Push "vaciá, cepillá y tapá". La API limita a una alerta
      cada 12 h por localidad, así que las corridas horarias no repiten la alerta.
+5. En paralelo, `POST /predicciones/recalcular` del motor predictivo, con el pronóstico recién cargado.
 
 ### `mantenimiento-diario.json`: Mantenimiento diario (03:10)
 

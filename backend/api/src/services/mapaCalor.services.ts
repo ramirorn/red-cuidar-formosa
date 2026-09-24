@@ -26,14 +26,9 @@ export interface FiltrosMapaCalor {
 
 // La API Node es la única puerta de entrada: autentica, aplica el alcance territorial
 // y recién entonces consulta al motor, que no está expuesto fuera de la red interna.
-export const obtenerMapaCalorService = async (usuario: UsuarioAutenticado, filtros: FiltrosMapaCalor) => {
-    const localidadId = alcanceLocalidad(usuario, filtros.localidadId);
-    const { desde, hasta } = resolverRango(filtros.desde, filtros.hasta);
-
-    const url = new URL('/mapa-calor', entorno.URL_MOTOR_PREDICTIVO);
-    url.searchParams.set('desde', desde.toISOString());
-    url.searchParams.set('hasta', hasta.toISOString());
-    if (localidadId !== null) url.searchParams.set('localidad_id', String(localidadId));
+const consultarMotor = async (ruta: string, parametros: Record<string, string>) => {
+    const url = new URL(ruta, entorno.URL_MOTOR_PREDICTIVO);
+    for (const [nombre, valor] of Object.entries(parametros)) url.searchParams.set(nombre, valor);
 
     let respuesta: Response;
     try {
@@ -51,4 +46,22 @@ export const obtenerMapaCalorService = async (usuario: UsuarioAutenticado, filtr
     }
 
     return respuesta.json();
+};
+
+export const obtenerMapaCalorService = async (usuario: UsuarioAutenticado, filtros: FiltrosMapaCalor) => {
+    const localidadId = alcanceLocalidad(usuario, filtros.localidadId);
+    const { desde, hasta } = resolverRango(filtros.desde, filtros.hasta);
+
+    return consultarMotor('/mapa-calor', {
+        desde: desde.toISOString(),
+        hasta: hasta.toISOString(),
+        ...(localidadId !== null ? { localidad_id: String(localidadId) } : {}),
+    });
+};
+
+// Riesgo esperado para las próximas 72 horas (lluvia pronosticada), calculado por el motor.
+export const obtenerPrediccionesService = async (usuario: UsuarioAutenticado, localidadSolicitada?: number) => {
+    const localidadId = alcanceLocalidad(usuario, localidadSolicitada);
+
+    return consultarMotor('/predicciones', localidadId !== null ? { localidad_id: String(localidadId) } : {});
 };

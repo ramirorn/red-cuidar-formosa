@@ -218,6 +218,32 @@
         }
       },
       "onError": "continueRegularOutput"
+    },
+    {
+      "id": "24b7f6f5-4f16-5bef-a5d3-3eef5e596157",
+      "name": "Actualizar predicciones",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1200,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.URL_MOTOR_PREDICTIVO }}/predicciones/recalcular",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "rcfClaveServici1",
+          "name": "Clave de servicio interno"
+        }
+      },
+      "onError": "continueRegularOutput"
     }
   ],
   "connections": {
@@ -281,6 +307,11 @@
         [
           {
             "node": "Lluvia últimas 24 h",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Actualizar predicciones",
             "type": "main",
             "index": 0
           }
