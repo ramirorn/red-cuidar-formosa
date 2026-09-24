@@ -1,0 +1,165 @@
+# Ecosistema de desarrollo de Red Cuidar Formosa.
+# Uso: cp .env.example .env && docker compose up --build
+#
+# Redes:
+#  - red_interna (sin salida a internet): base de datos, Redis y motor predictivo.
+#  - red_publica: servicios que exponen puertos o necesitan internet (API y n8n).
+
+services:
+  db:
+    image: postgis/postgis:17-3.5
+    container_name: rcf_db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Falta POSTGRES_PASSWORD}
+      POSTGRES_DB: red_cuidar
+      # Las usa db/init/01-inicializar.sh para crear un rol por servicio.
+      DB_API_PASSWORD: ${DB_API_PASSWORD:?Falta DB_API_PASSWORD}
+      DB_MOTOR_PASSWORD: ${DB_MOTOR_PASSWORD:?Falta DB_MOTOR_PASSWORD}
+      DB_N8N_PASSWORD: ${DB_N8N_PASSWORD:?Falta DB_N8N_PASSWORD}
+    volumes:
+      - datos_postgres:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d red_cuidar"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - red_interna
+
+  redis:
+    image: redis:7-alpine
+    container_name: rcf_redis
+    restart: always
+    # Solo caché: sin persistencia en disco.
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?Falta REDIS_PASSWORD}", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" --no-auth-warning ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    networks:
+      - red_interna
+
+  api:
+    build: ./api
+    container_name: rcf_api
+    restart: always
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      DATABASE_URL: postgresql://rol_api:${DB_API_PASSWORD}@db:5432/red_cuidar
+      JWT_SECRET: ${JWT_SECRET:?Falta JWT_SECRET}
+      JWT_SECRET_SESIONES: ${JWT_SECRET_SESIONES:?Falta JWT_SECRET_SESIONES}
+      CLAVE_SERVICIO_INTERNO: ${CLAVE_SERVICIO_INTERNO:?Falta CLAVE_SERVICIO_INTERNO}
+      CORS_ORIGENES: ${CORS_ORIGENES:-http://localhost:5173}
+      DIR_EVIDENCIAS: /datos/evidencias
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      URL_MOTOR_PREDICTIVO: http://motor-predictivo:8000
+      SEMILLA_ADMIN_EMAIL: ${SEMILLA_ADMIN_EMAIL:-}
+      SEMILLA_ADMIN_PASSWORD: ${SEMILLA_ADMIN_PASSWORD:-}
+      SEMILLA_MANZANAS_EJEMPLO: ${SEMILLA_MANZANAS_EJEMPLO:-false}
+    ports:
+      - "3000:3000"
+    volumes:
+      - evidencias:/datos/evidencias
+      # Recarga en caliente del código fuente.
+      - ./api/src:/app/src:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - red_interna
+      - red_publica
+
+  motor-predictivo:
+    build: ./motor-predictivo
+    container_name: rcf_motor_predictivo
+    restart: always
+    environment:
+      URL_BASE_DATOS: postgresql://rol_motor:${DB_MOTOR_PASSWORD}@db:5432/red_cuidar
+      URL_REDIS: redis://:${REDIS_PASSWORD}@redis:6379
+      CLAVE_SERVICIO_INTERNO: ${CLAVE_SERVICIO_INTERNO}
+    volumes:
+      - ./motor-predictivo/app:/app/app:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # Sin puertos publicados: solo lo consulta la API por la red interna.
+    networks:
+      - red_interna
+
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: rcf_n8n
+    restart: always
+    environment:
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: db
+      DB_POSTGRESDB_PORT: 5432
+      DB_POSTGRESDB_DATABASE: n8n
+      DB_POSTGRESDB_USER: rol_n8n
+      DB_POSTGRESDB_PASSWORD: ${DB_N8N_PASSWORD}
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?Falta N8N_ENCRYPTION_KEY}
+      N8N_LISTEN_ADDRESS: 0.0.0.0
+      GENERIC_TIMEZONE: America/Argentina/Buenos_Aires
+      TZ: America/Argentina/Buenos_Aires
+      WEBHOOK_URL: http://localhost:5678/
+      N8N_SECURE_COOKIE: "false"
+      N8N_DIAGNOSTICS_ENABLED: "false"
+      N8N_PERSONALIZATION_ENABLED: "false"
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
+      # Variables que leen los flujos con $env.
+      URL_API: http://api:3000/api
+      CLAVE_SERVICIO_INTERNO: ${CLAVE_SERVICIO_INTERNO}
+      URL_OLLAMA: ${URL_OLLAMA:-http://host.docker.internal:11434}
+      MODELO_OLLAMA: ${MODELO_OLLAMA:-nemotron-3-nano:4b}
+    ports:
+      - "127.0.0.1:5678:5678"
+    volumes:
+      - datos_n8n:/home/node/.n8n
+      - ./orquestador/n8n/flujos:/flujos:ro
+    # Permite llegar a Ollama corriendo en la computadora anfitriona.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - red_interna
+      - red_publica
+
+  # Opcional: Ollama dentro de Docker (docker compose --profile ollama-contenedor up).
+  # Por defecto se usa el Ollama instalado en la computadora anfitriona.
+  ollama:
+    image: ollama/ollama:latest
+    container_name: rcf_ollama
+    restart: always
+    profiles: ["ollama-contenedor"]
+    entrypoint: ["/bin/sh", "/iniciar-modelos.sh"]
+    environment:
+      MODELO_OLLAMA: ${MODELO_OLLAMA:-nemotron-3-nano:4b}
+    volumes:
+      - modelos_ollama:/root/.ollama
+      - ./orquestador/ollama/iniciar-modelos.sh:/iniciar-modelos.sh:ro
+    networks:
+      - red_publica
+
+networks:
+  red_interna:
+    internal: true
+  red_publica:
+
+volumes:
+  datos_postgres:
+  evidencias:
+  datos_n8n:
+  modelos_ollama:
