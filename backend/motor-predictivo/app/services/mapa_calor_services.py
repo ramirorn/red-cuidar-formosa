@@ -53,11 +53,13 @@ def calcular_indice_riesgo(factores: FactoresRiesgo) -> float:
     return round(min(indice * multiplicador, 1.0), 3)
 
 
-def _redondear(fecha: datetime) -> datetime:
-    """Pasa a UTC sin zona (así se guardan las fechas) y redondea hacia abajo a la ventana de caché."""
-    utc = fecha.astimezone(timezone.utc).replace(tzinfo=None)
+def redondear_a_ventana(fecha: datetime, hacia_arriba: bool = False) -> datetime:
+    """Pasa a UTC sin zona (así se guardan las fechas) y la ajusta a la ventana de caché.
+    El fin del rango se redondea hacia arriba para no dejar afuera los reportes más recientes."""
     segundos = int(VENTANA_CACHE.total_seconds())
-    return datetime.fromtimestamp((int(utc.timestamp()) // segundos) * segundos)
+    marca = fecha.astimezone(timezone.utc).timestamp()
+    ventanas = -(-marca // segundos) if hacia_arriba else marca // segundos
+    return datetime.fromtimestamp(int(ventanas) * segundos, tz=timezone.utc).replace(tzinfo=None)
 
 
 # Una sola consulta agregada para todas las manzanas del área (sin consultas N+1).
@@ -121,7 +123,7 @@ async def _guardar_cache(clave: str | None, contenido: str) -> None:
 
 
 async def obtener_mapa_calor_service(desde: datetime, hasta: datetime, localidad_id: int | None) -> tuple[dict, bool]:
-    desde_utc, hasta_utc = _redondear(desde), _redondear(hasta)
+    desde_utc, hasta_utc = redondear_a_ventana(desde), redondear_a_ventana(hasta, hacia_arriba=True)
     clave_base = f"{localidad_id or 'provincia'}:{desde_utc.isoformat()}:{hasta_utc.isoformat()}"
 
     clave, en_cache = await _leer_cache(clave_base)

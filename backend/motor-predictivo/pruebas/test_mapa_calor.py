@@ -6,7 +6,9 @@ os.environ.setdefault("CLAVE_SERVICIO_INTERNO", "clave-servicio-interno-de-prueb
 from fastapi.testclient import TestClient  # noqa: E402
 
 from app.routes.mapa_calor_routes import mapa_calor_router  # noqa: E402
-from app.services.mapa_calor_services import FactoresRiesgo, calcular_indice_riesgo  # noqa: E402
+from datetime import datetime, timezone  # noqa: E402
+
+from app.services.mapa_calor_services import FactoresRiesgo, calcular_indice_riesgo, redondear_a_ventana  # noqa: E402
 from fastapi import FastAPI  # noqa: E402
 
 
@@ -44,3 +46,14 @@ def test_el_mapa_exige_la_clave_de_servicio():
     cliente = TestClient(app)
     assert cliente.get("/mapa-calor").status_code == 401
     assert cliente.get("/mapa-calor", headers={"x-clave-servicio": "incorrecta"}).status_code == 401
+
+
+def test_el_fin_del_rango_se_redondea_hacia_arriba_para_incluir_reportes_recientes():
+    fecha = datetime(2026, 9, 24, 23, 13, 3, tzinfo=timezone.utc)
+    assert redondear_a_ventana(fecha) == datetime(2026, 9, 24, 23, 10)
+    assert redondear_a_ventana(fecha, hacia_arriba=True) == datetime(2026, 9, 24, 23, 15)
+
+
+def test_las_fechas_se_convierten_a_utc_sin_zona():
+    fecha = datetime.fromisoformat("2026-09-24T20:13:03-03:00")
+    assert redondear_a_ventana(fecha, hacia_arriba=True) == datetime(2026, 9, 24, 23, 15)
