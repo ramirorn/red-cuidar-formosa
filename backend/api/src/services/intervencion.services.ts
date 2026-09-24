@@ -23,6 +23,7 @@ export interface DatosIntervencion {
     tipoCuerpoAgua?: string;
     observaciones?: string;
     reporteId?: string;
+    paradaRutaId?: number;
 }
 
 export const registrarIntervencionService = async (usuario: UsuarioAutenticado, datos: DatosIntervencion) => {
@@ -44,6 +45,20 @@ export const registrarIntervencionService = async (usuario: UsuarioAutenticado, 
             }
         }
 
+        // Si la intervención se hizo dentro de una ruta, la parada debe ser de esa manzana y la ruta estar en curso.
+        if (datos.paradaRutaId !== undefined) {
+            const parada = await tx.paradaRuta.findUnique({
+                where: { id: datos.paradaRutaId },
+                select: { manzanaId: true, ruta: { select: { estado: true, brigadistaId: true } } },
+            });
+            if (!parada || parada.manzanaId !== manzana.id || parada.ruta.estado !== 'EN_CURSO') {
+                throw new ErrorHttp(422, 'La parada indicada no corresponde a esta manzana o su ruta no está en curso');
+            }
+            if (usuario.rol === 'BRIGADISTA' && parada.ruta.brigadistaId !== usuario.id) {
+                throw new ErrorHttp(422, 'La parada indicada pertenece a una ruta asignada a otro brigadista');
+            }
+        }
+
         const tieneUbicacion = datos.latitud !== undefined && datos.longitud !== undefined;
         const ubicacion = tieneUbicacion
             ? Prisma.sql`ST_SetSRID(ST_MakePoint(${datos.longitud}::float8, ${datos.latitud}::float8), 4326)::geography`
@@ -51,18 +66,25 @@ export const registrarIntervencionService = async (usuario: UsuarioAutenticado, 
 
         const [intervencion] = await tx.$queryRaw<{ id: string }[]>`
             INSERT INTO "intervencion" (
-                "id", "tipo", "manzanaId", "usuarioId", "reporteId", "realizadaEn", "ubicacion",
+                "id", "tipo", "manzanaId", "usuarioId", "reporteId", "paradaRutaId", "realizadaEn", "ubicacion",
                 "cantidadProducto", "unidadProducto", "tipoCuerpoAgua", "observaciones"
             )
             VALUES (
                 gen_random_uuid(), ${datos.tipo}::"TipoIntervencion", ${manzana.id}, ${usuario.id},
-                ${datos.reporteId ?? null}::uuid, ${datos.realizadaEn}, ${ubicacion},
+                ${datos.reporteId ?? null}::uuid, ${datos.paradaRutaId ?? null}::int, ${datos.realizadaEn}, ${ubicacion},
                 ${datos.cantidadProducto ?? null}::float8, ${datos.unidadProducto ?? null},
                 ${datos.tipoCuerpoAgua ?? null}, ${datos.observaciones ?? null}
             )
             RETURNING "id"
         `;
         if (!intervencion) throw new ErrorHttp(500, 'No se pudo registrar la intervención');
+
+        if (datos.paradaRutaId !== undefined) {
+            await tx.paradaRuta.updateMany({
+                where: { id: datos.paradaRutaId, visitadaEn: null },
+                data: { visitadaEn: new Date() },
+            });
+        }
 
         if (datos.reporteId && TIPOS_QUE_RESUELVEN.includes(datos.tipo)) {
             await tx.reporte.updateMany({
@@ -91,6 +113,7 @@ export const registrarIntervencionService = async (usuario: UsuarioAutenticado, 
             cantidadProducto: true,
             unidadProducto: true,
             reporteId: true,
+            paradaRutaId: true,
             manzana: { select: { id: true, codigo: true, estado: true } },
         },
     });

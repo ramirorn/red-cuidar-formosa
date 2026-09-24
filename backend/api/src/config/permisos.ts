@@ -13,6 +13,9 @@ export const PERMISOS = {
     METRICAS_LEER: 'metricas:leer',
     MAPA_CALOR_LEER: 'mapa_calor:leer',
     EXPORTACIONES_DESCARGAR: 'exportaciones:descargar',
+    RUTAS_LEER: 'rutas:leer',
+    RUTAS_GESTIONAR: 'rutas:gestionar',
+    RUTAS_EJECUTAR: 'rutas:ejecutar',
     USUARIOS_GESTIONAR: 'usuarios:gestionar',
     AUDITORIA_LEER: 'auditoria:leer',
 } as const;
@@ -31,6 +34,7 @@ export const PERMISOS_POR_ROL: Record<Rol, readonly Permiso[]> = {
         PERMISOS.METRICAS_LEER,
         PERMISOS.MAPA_CALOR_LEER,
         PERMISOS.EXPORTACIONES_DESCARGAR,
+        PERMISOS.RUTAS_LEER,
     ],
     COORDINADOR_BRIGADA: [
         PERMISOS.REPORTES_LEER,
@@ -41,6 +45,9 @@ export const PERMISOS_POR_ROL: Record<Rol, readonly Permiso[]> = {
         PERMISOS.METRICAS_LEER,
         PERMISOS.MAPA_CALOR_LEER,
         PERMISOS.EXPORTACIONES_DESCARGAR,
+        PERMISOS.RUTAS_LEER,
+        PERMISOS.RUTAS_GESTIONAR,
+        PERMISOS.RUTAS_EJECUTAR,
     ],
     BRIGADISTA: [
         PERMISOS.REPORTES_LEER,
@@ -48,6 +55,8 @@ export const PERMISOS_POR_ROL: Record<Rol, readonly Permiso[]> = {
         PERMISOS.INTERVENCIONES_LEER,
         PERMISOS.INTERVENCIONES_REGISTRAR,
         PERMISOS.MAPA_CALOR_LEER,
+        PERMISOS.RUTAS_LEER,
+        PERMISOS.RUTAS_EJECUTAR,
     ],
     AUDITOR: [
         PERMISOS.REPORTES_LEER,
@@ -55,6 +64,7 @@ export const PERMISOS_POR_ROL: Record<Rol, readonly Permiso[]> = {
         PERMISOS.METRICAS_LEER,
         PERMISOS.MAPA_CALOR_LEER,
         PERMISOS.AUDITORIA_LEER,
+        PERMISOS.RUTAS_LEER,
     ],
 };
 

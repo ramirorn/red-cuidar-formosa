@@ -28,6 +28,7 @@ export const validarRegistrarIntervencion = [
     body('tipoCuerpoAgua').optional().isString().trim().isLength({ max: 100 }),
     body('observaciones').optional().isString().trim().isLength({ max: 500 }),
     body('reporteId').optional().isUUID(4).withMessage('reporteId inválido'),
+    body('paradaRutaId').optional().isInt({ min: 1 }).withMessage('paradaRutaId inválido').toInt(),
 ];
 
 export const validarListarIntervenciones = [
