@@ -12,7 +12,7 @@ RUN npm ci
 COPY prisma ./prisma
 RUN npx prisma generate
 
-COPY tsconfig.json tsconfig.build.json vitest.config.ts ./
+COPY tsconfig.json tsconfig.build.json vitest.config.ts openapi.yaml ./
 COPY src ./src
 
 # Se ejecuta sin privilegios de root; el volumen de evidencias hereda este dueño.

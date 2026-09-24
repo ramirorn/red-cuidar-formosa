@@ -92,6 +92,9 @@ Si alguien pide un recurso de otra localidad, recibe 404, así no puede confirma
 | Métricas epidemiológicas | ✔ | ✔ | ✔ | | ✔ |
 | Mapa de calor | ✔ | ✔ | ✔ | ✔ | ✔ |
 | Exportar CSV | ✔ (coordenadas exactas) | ✔ (≈ 110 m) | ✔ (≈ 110 m) | | |
+| Ver rutas de brigada | ✔ | ✔ | ✔ | ✔ (solo las asignadas) | ✔ |
+| Generar rutas | ✔ | | ✔ | | |
+| Ejecutar rutas (iniciar, marcar paradas) | ✔ | | ✔ | ✔ (no puede cancelar) | |
 | Gestionar usuarios | ✔ | | | | |
 | Leer auditoría | ✔ | | | | ✔ |
 | **Alcance** | Provincia | Provincia | Su localidad | Su localidad | Provincia |
@@ -106,6 +109,14 @@ Rol, localidad y estado activo se leen de la base en cada petición: una baja o 
 tiene efecto inmediato, aunque el token de acceso todavía no haya vencido.
 
 ## Endpoints
+
+El contrato completo está en [`api/openapi.yaml`](api/openapi.yaml) (OpenAPI 3.1). En desarrollo se publica en
+`GET /api/documentacion/openapi.yaml` y se valida con `npx @redocly/cli lint api/openapi.yaml`.
+La prueba `contrato.test.ts` falla si el contrato documenta una ruta que la API no tiene.
+
+**Ruteo de brigadas:** una ruta toma primero las manzanas en ROJO y después las AMARILLAS más recientes,
+sin repetir las que ya están en otra ruta activa del mismo día. Las paradas se ordenan por vecino más
+cercano desde el punto de partida. Una intervención registrada con `paradaRutaId` marca la parada como visitada.
 
 ### Ciudadanía (anónima)
 
@@ -130,6 +141,9 @@ tiene efecto inmediato, aunque el token de acceso todavía no haya vencido.
 | GET | `/api/institucional/mapa-calor` | `mapa_calor:leer` |
 | GET | `/api/institucional/exportaciones/reportes` · `/exportaciones/intervenciones` | `exportaciones:descargar` |
 | POST / GET / PATCH | `/api/institucional/usuarios` | `usuarios:gestionar` |
+| POST / GET | `/api/institucional/rutas` · GET `/rutas/:id` | `rutas:gestionar` / `rutas:leer` |
+| PATCH | `/api/institucional/rutas/:id/estado` · `/rutas/:id/paradas/:paradaId/visitada` | `rutas:ejecutar` |
+| GET | `/api/institucional/auditoria` | `auditoria:leer` |
 
 Los listados usan paginación por cursor (`limite` ≤ 200, `cursor` opaco) y los rangos de fecha tienen un máximo de 366 días.
 

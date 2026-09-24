@@ -1,4 +1,4 @@
-import { Prisma, type ClaseObjeto, type EstadoReporte, type TipoReporte } from '@prisma/client';
+import { Prisma, type ClaseObjeto, type EstadoReporte, type OrigenReporte, type TipoReporte } from '@prisma/client';
 import prisma from '../config/prisma.js';
 import { ROLES_COORDENADAS_EXACTAS } from '../config/permisos.js';
 import type { UsuarioAutenticado } from '../middlewares/autenticacion.middleware.js';
@@ -32,6 +32,7 @@ export interface DeteccionEntrada {
 export interface DatosReporte {
     idCliente: string;
     tipo: TipoReporte;
+    origen?: OrigenReporte;
     latitud: number;
     longitud: number;
     capturadoEn: Date;
@@ -117,7 +118,7 @@ export const crearReporteService = async (sesionId: string, datos: DatosReporte,
             // ON CONFLICT cubre la carrera entre dos reintentos simultáneos del mismo reporte.
             const [insertado] = await tx.$queryRaw<{ id: string; manzanaId: number | null }[]>`
                 INSERT INTO "reporte" (
-                    "id", "idCliente", "sesionId", "manzanaId", "tipo", "estado", "ubicacion",
+                    "id", "idCliente", "sesionId", "manzanaId", "tipo", "origen", "estado", "ubicacion",
                     "precisionGpsM", "confianzaIa", "descripcion", "reporteResueltoId", "capturadoEn", "updatedAt"
                 )
                 VALUES (
@@ -127,7 +128,7 @@ export const crearReporteService = async (sesionId: string, datos: DatosReporte,
                         WHERE ST_Contains(m."geom", ST_SetSRID(ST_MakePoint(${datos.longitud}::float8, ${datos.latitud}::float8), 4326))
                         LIMIT 1
                     ),
-                    ${datos.tipo}::"TipoReporte", ${estado}::"EstadoReporte",
+                    ${datos.tipo}::"TipoReporte", ${datos.origen ?? 'PWA'}::"OrigenReporte", ${estado}::"EstadoReporte",
                     ST_SetSRID(ST_MakePoint(${datos.longitud}::float8, ${datos.latitud}::float8), 4326)::geography,
                     ${datos.precisionGpsM ?? null}::float8, ${datos.confianzaIa ?? null}::float8,
                     ${datos.descripcion ?? null}, ${datos.reporteResueltoId ?? null}::uuid,

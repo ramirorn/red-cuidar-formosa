@@ -1,0 +1,10 @@
+# Reglas del linter de OpenAPI (npx @redocly/cli lint openapi.yaml).
+extends:
+  - recommended
+rules:
+  # El servidor de desarrollo es localhost a propósito.
+  no-server-example.com: off
+  # La licencia del proyecto todavía no está definida.
+  info-license: off
+  # /salud y /auth/cerrar-sesion no tienen respuestas 4xx posibles.
+  operation-4xx-response: off

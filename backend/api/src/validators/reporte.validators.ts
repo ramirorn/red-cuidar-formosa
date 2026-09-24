@@ -1,5 +1,5 @@
 import { body, query } from 'express-validator';
-import { ClaseObjeto, EstadoReporte, TipoReporte } from '@prisma/client';
+import { ClaseObjeto, EstadoReporte, OrigenReporte, TipoReporte } from '@prisma/client';
 import { validarIdUuid, validarLatitud, validarLocalidadConsulta, validarLongitud, validarPaginacion, validarRangoFechas } from './comun.validators.js';
 
 const MAXIMO_DETECCIONES = 50;
@@ -44,6 +44,7 @@ const convertirDetecciones = (valor: unknown) => {
 export const validarCrearReporte = [
     body('idCliente').isUUID(4).withMessage('idCliente debe ser un UUID v4 generado por la PWA'),
     body('tipo').isIn(Object.values(TipoReporte)).withMessage('tipo inválido'),
+    body('origen').optional().isIn(Object.values(OrigenReporte)).withMessage('origen debe ser PWA o CHAT'),
     validarLatitud('latitud'),
     validarLongitud('longitud'),
     body('capturadoEn')

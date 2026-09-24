@@ -1,0 +1,1116 @@
+openapi: 3.1.0
+info:
+  title: Red Cuidar Formosa — API
+  version: 1.0.0
+  summary: API de Recepción de Evidencia y API Core del Dashboard Institucional.
+  description: |
+    Todas las respuestas usan el mismo sobre:
+
+    - Éxito: `{ "status": "success", "data": ..., "pagination"?: ... }`
+    - Error: `{ "status": "error", "message": "...", "errors"?: [...] }`
+
+    **Autenticación**
+
+    - Ciudadanía: token de sesión anónima (`POST /sesiones`), enviado como `Authorization: Bearer`.
+    - Personal institucional: token de acceso de 15 minutos (`POST /auth/login`), enviado como `Authorization: Bearer`.
+      El token de refresco viaja solo en la cookie httpOnly `rcf_refresco`.
+    - Servicios internos: cabecera `x-clave-servicio`.
+
+    Un token de sesión ciudadana nunca es válido en rutas institucionales, y viceversa.
+
+    **Paginación:** los listados usan cursor opaco (`cursor`) y `limite` (1 a 200, por defecto 50).
+    Para pedir la página siguiente se envía `pagination.siguienteCursor`.
+
+    **Límites de tasa:** 300 peticiones por minuto e IP en general; 20 sesiones por hora e IP;
+    30 reportes cada 15 minutos por sesión; 10 intentos de login cada 15 minutos por IP.
+    Al superarlos se responde 429 con las cabeceras `RateLimit` y `RateLimit-Policy`.
+servers:
+  - url: http://localhost:3000/api
+    description: Desarrollo (docker compose)
+tags:
+  - name: Ciudadanía
+    description: API de Recepción de Evidencia y Sincronización (PWA anónima).
+  - name: Autenticación
+    description: Inicio y cierre de sesión del personal institucional.
+  - name: Reportes
+    description: Gestión institucional de los reportes ciudadanos.
+  - name: Evidencias
+    description: Fotos de los reportes, servidas solo con autenticación.
+  - name: Intervenciones
+    description: Trabajo de campo (BTI, fumigación, descacharrado, inspección).
+  - name: Rutas
+    description: Rutas diarias de brigadas y su avance.
+  - name: Métricas
+    description: Indicadores epidemiológicos y mapa de calor.
+  - name: Exportaciones
+    description: Informes CSV auditados.
+  - name: Usuarios
+    description: Cuentas del personal institucional.
+  - name: Auditoría
+    description: Registro de accesos a datos sensibles.
+  - name: Interno
+    description: Rutas para n8n y otros servicios. No las usan los navegadores.
+
+paths:
+  /salud:
+    get:
+      operationId: verificarSalud
+      summary: Estado de la API y de la base de datos
+      tags: [Interno]
+      security: []
+      responses:
+        '200':
+          description: Servicio operativo
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Exito' }
+        '503':
+          $ref: '#/components/responses/NoDisponible'
+
+  # ---------------------------------------------------------------------------
+  # Ciudadanía
+  # ---------------------------------------------------------------------------
+  /sesiones:
+    post:
+      operationId: crearSesion
+      summary: Crea una sesión anónima
+      description: No pide ni guarda datos personales. La sesión se elimina tras 30 días sin actividad.
+      tags: [Ciudadanía]
+      security: []
+      responses:
+        '201':
+          description: Sesión creada
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Exito'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [sesionId, token]
+                        properties:
+                          sesionId: { type: string, format: uuid }
+                          token: { type: string, description: JWT de sesión (vigencia 90 días) }
+        '429':
+          $ref: '#/components/responses/DemasiadasSolicitudes'
+
+  /reportes:
+    post:
+      operationId: crearReporte
+      summary: Envía un reporte con evidencia fotográfica
+      description: |
+        Es idempotente por `idCliente`: la PWA puede reintentarlo desde su cola de Background Sync.
+        Responde 201 si lo crea y 200 con el mismo reporte si ya existía.
+
+        Las imágenes se verifican por su firma binaria y se re-codifican sin metadatos EXIF.
+        Se valida automáticamente si `confianzaIa` ≥ 0,6.
+      tags: [Ciudadanía]
+      security:
+        - sesionAnonima: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [idCliente, tipo, latitud, longitud, capturadoEn, imagenes]
+              properties:
+                idCliente: { type: string, format: uuid, description: UUID v4 generado por la PWA }
+                tipo: { $ref: '#/components/schemas/TipoReporte' }
+                origen: { $ref: '#/components/schemas/OrigenReporte' }
+                latitud: { type: number, minimum: -27.0, maximum: -21.9 }
+                longitud: { type: number, minimum: -62.4, maximum: -57.5 }
+                capturadoEn:
+                  type: string
+                  format: date-time
+                  description: Hora del dispositivo; como máximo 30 días atrás y 5 minutos adelante.
+                precisionGpsM: { type: number, minimum: 0, maximum: 5000 }
+                confianzaIa: { type: number, minimum: 0, maximum: 1 }
+                descripcion: { type: string, maxLength: 500 }
+                reporteResueltoId:
+                  type: string
+                  format: uuid
+                  description: Solo para `LIMPIEZA`; criadero de la misma sesión que queda resuelto.
+                detecciones:
+                  type: string
+                  description: 'Lista JSON de hasta 50 elementos `{ clase, confianza, cajaDelimitadora: { x, y, ancho, alto } }`, todos entre 0 y 1.'
+                  example: '[{"clase":"NEUMATICO","confianza":0.91,"cajaDelimitadora":{"x":0.1,"y":0.2,"ancho":0.3,"alto":0.25}}]'
+                imagenes:
+                  type: array
+                  minItems: 1
+                  maxItems: 3
+                  items:
+                    type: string
+                    format: binary
+                    description: JPEG, PNG o WebP de hasta 5 MB
+      responses:
+        '200':
+          description: El reporte ya había sido recibido (reintento)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RespuestaReporteResumen' }
+        '201':
+          description: Reporte creado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RespuestaReporteResumen' }
+        '400': { $ref: '#/components/responses/SolicitudInvalida' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '409':
+          description: Una de las imágenes ya fue enviada en otro reporte
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '413':
+          description: Una imagen supera los 5 MB
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '415':
+          description: El archivo no es una imagen válida
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '422':
+          description: Imagen dañada o reporte a resolver inexistente
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '429': { $ref: '#/components/responses/DemasiadasSolicitudes' }
+
+  /reportes/mios:
+    get:
+      operationId: listarMisReportes
+      summary: Reportes de la sesión (conciliación de la cola offline)
+      tags: [Ciudadanía]
+      security:
+        - sesionAnonima: []
+      parameters:
+        - $ref: '#/components/parameters/Limite'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Página de reportes
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ExitoPaginado'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/ReporteResumen' }
+        '400': { $ref: '#/components/responses/SolicitudInvalida' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+
+  /manzanas:
+    get:
+      operationId: listarManzanas
+      summary: Mapa comunitario de manzanas (GeoJSON)
+      description: Público. El recuadro no puede superar 0,1° por lado. Respuesta cacheable 60 segundos.
+      tags: [Ciudadanía]
+      security: []
+      parameters:
+        - { name: longitudMinima, in: query, required: true, schema: { type: number } }
+        - { name: latitudMinima, in: query, required: true, schema: { type: number } }
+        - { name: longitudMaxima, in: query, required: true, schema: { type: number } }
+        - { name: latitudMaxima, in: query, required: true, schema: { type: number } }
+      responses:
+        '200':
+          description: FeatureCollection con el estado de cada manzana
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Exito'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/ColeccionGeoJson' }
+        '400': { $ref: '#/components/responses/SolicitudInvalida' }
+
+  /suscripciones-push:
+    post:
+      operationId: guardarSuscripcion
+      summary: Registra o actualiza la suscripción Web Push del navegador
+      tags: [Ciudadanía]
+      security:
+        - sesionAnonima: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [endpoint, keys]
+              properties:
+                endpoint: { type: string, format: uri, description: URL https del servicio push }
+                keys:
+                  type: object
+                  required: [p256dh, auth]
+                  properties:
+                    p256dh: { type: string }
+                    auth: { type: string }
+                localidadId: { type: integer, minimum: 1 }
+      responses:
+        '201':
+          description: Suscripción guardada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Exito' }
+        '400': { $ref: '#/components/responses/SolicitudInvalida' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '422':
+          description: La localidad no existe
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    delete:
+      operationId: eliminarSuscripcion
+      summary: Da de baja la suscripción Web Push
+      tags: [Ciudadanía]
+      security:
+        - sesionAnonima: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [endpoint]
+              properties:
+                endpoint: { type: string, format: uri }
+      responses:
+        '204': { description: Suscripción eliminada }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+
+  # ---------------------------------------------------------------------------
+  # Autenticación institucional
+  # ---------------------------------------------------------------------------
+  /auth/login:
+    post:
+      operationId: iniciarSesion
+      summary: Inicia sesión del personal institucional
+      tags: [Autenticación]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, maxLength: 128 }
+      responses:
+        '200':
+          description: Sesión iniciada. Además fija la cookie httpOnly `rcf_refresco`.
+          headers:
+            Set-Cookie:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Exito'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          usuario: { $ref: '#/components/schemas/UsuarioPublico' }
+                          token: { type: string, description: JWT de acceso (15 minutos) }
+        '400': { $ref: '#/components/responses/SolicitudInvalida' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '429': { $ref: '#/components/responses/DemasiadasSolicitudes' }
+
+  /auth/refrescar:
+    post:
+      operationId: refrescarToken
+      summary: Emite un nuevo token de acceso
+      description: |
+        Rota el token de refresco en cada uso. Si se presenta uno ya usado, se revocan todas las
+        sesiones del usuario.
+      tags: [Autenticación]
+      security:
+        - cookieRefresco: []
+      responses:
+        '200':
+          description: Nuevo token de acceso; la cookie se reemplaza.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Exito'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          token: { type: string }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+
+  /auth/cerrar-sesion:
+    post:
+      operationId: cerrarSesion
+      summary: Revoca el token de refresco y borra la cookie
+      tags: [Autenticación]
+      security:
+        - cookieRefresco: []
+      responses:
+        '204': { description: Sesión cerrada }
+
+  # ---------------------------------------------------------------------------
+  # Dashboard institucional
+  # ---------------------------------------------------------------------------
+  /institucional/reportes:
+    get:
+      operationId: listarReportes
+      summary: Lista reportes ciudadanos
+      description: 'Permiso `reportes:leer`. Los roles locales solo ven su localidad.'
+      tags: [Reportes]
+      security:
+        - institucional: []
+      parameters:
+        - $ref: '#/components/parameters/Limite'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Desde'
+        - $ref: '#/components/parameters/Hasta'
+        - $ref: '#/components/parameters/LocalidadId'
+        - { name: estado, in: query, schema: { $ref: '#/components/schemas/EstadoReporte' } }
+        - { name: tipo, in: query, schema: { $ref: '#/components/schemas/TipoReporte' } }
+        - { name: manzanaId, in: query, schema: { type: integer, minimum: 1 } }
+      responses:
+        '200':
+          description: Página de reportes
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExitoPaginado' }
+        '400': { $ref: '#/components/responses/SolicitudInvalida' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+
+  /institucional/reportes/{id}:
+    get:
+      operationId: obtenerReporte
+      summary: Detalle de un reporte, con ubicación, detecciones y evidencias
+      tags: [Reportes]
+      security:
+        - institucional: []
+      parameters:
+        - $ref: '#/components/parameters/IdUuid'
+      responses:
+        '200':
+          description: Reporte
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Exito' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+
+  /institucional/reportes/{id}/estado:
+    patch:
+      operationId: cambiarEstadoReporte
+      summary: Valida, rechaza o resuelve un reporte
+      description: |
+        Permiso `reportes:validar`. Transiciones permitidas:
+        PENDIENTE → VALIDADO | RECHAZADO; VALIDADO → RESUELTO | RECHAZADO; RECHAZADO → VALIDADO.
+        Recalcula el color de la manzana.
+      tags: [Reportes]
+      security:
+        - institucional: []
+      parameters:
+        - $ref: '#/components/parameters/IdUuid'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [estado]
+              properties:
+                estado: { type: string, enum: [VALIDADO, RECHAZADO, RESUELTO] }
+                motivoRechazo: { type: string, minLength: 3, maxLength: 300, description: Obligatorio al rechazar }
+      responses:
+        '200':
+          description: Estado actualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Exito' }
+        '400': { $ref: '#/components/responses/SolicitudInvalida' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409': { $ref: '#/components/responses/Conflicto' }
+
+  /institucional/evidencias/{id}/imagen:
+    get:
+      operationId: obtenerImagenEvidencia
+      summary: Descarga la foto de una evidencia
+      description: 'Permiso `evidencias:ver`, con alcance territorial.'
+      tags: [Evidencias]
+      security:
+        - institucional: []
+      parameters:
+        - $ref: '#/components/parameters/IdUuid'
+      responses:
+        '200':
+          description: Imagen JPEG
+          content:
+            image/jpeg:
+              schema: { type: string, format: binary }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+
+  /institucional/intervenciones:
+    post:
+      operationId: registrarIntervencion
+      summary: Registra una intervención de campo
+      description: |
+        Permiso `intervenciones:registrar`. Una aplicación de BTI exige `cantidadProducto` y `unidadProducto`.
+        Si se indica `reporteId`, BTI, descacharrado y fumigación lo marcan RESUELTO.
+        Si se indica `paradaRutaId`, la parada queda visitada.
+      tags: [Intervenciones]
+      security:
+        - institucional: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tipo, manzanaId, realizadaEn]
+              properties:
+                tipo: { $ref: '#/components/schemas/TipoIntervencion' }
+                manzanaId: { type: integer, minimum: 1 }
+                realizadaEn: { type: string, format: date-time }
+                latitud: { type: number }
+                longitud: { type: number }
+                cantidadProducto: { type: number, exclusiveMinimum: 0 }
+                unidadProducto: { type: string, enum: [g, kg, ml, l, comprimidos] }
+                tipoCuerpoAgua: { type: string, maxLength: 100 }
+                observaciones: { type: string, maxLength: 500 }
+                reporteId: { type: string, format: uuid }
+                paradaRutaId: { type: integer, minimum: 1 }
+      responses:
+        '201':
+          description: Intervención registrada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Exito' }
+        '400': { $ref: '#/components/responses/SolicitudInvalida' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '422':
+          description: El reporte o la parada no corresponden a la manzana
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    get:
+      operationId: listarIntervenciones
+      summary: Lista intervenciones
+      tags: [Intervenciones]
+      security:
+        - institucional: []
+      parameters:
+        - $ref: '#/components/parameters/Limite'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Desde'
+        - $ref: '#/components/parameters/Hasta'
+        - $ref: '#/components/parameters/LocalidadId'
+        - { name: tipo, in: query, schema: { $ref: '#/components/schemas/TipoIntervencion' } }
+        - { name: manzanaId, in: query, schema: { type: integer, minimum: 1 } }
+      responses:
+        '200':
+          description: Página de intervenciones
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExitoPaginado' }
+        '400': { $ref: '#/components/responses/SolicitudInvalida' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+
+  /institucional/rutas:
+    post:
+      operationId: generarRuta
+      summary: Genera la ruta del día para una brigada
+      description: |
+        Permiso `rutas:gestionar`. Toma primero las manzanas en ROJO y luego las AMARILLAS más recientes,
+        sin repetir las que ya están en otra ruta activa de la misma fecha, y las ordena por vecino más cercano.
+        Los roles provinciales deben indicar `localidadId`.
+      tags: [Rutas]
+      security:
+        - institucional: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fecha]
+              properties:
+                fecha: { type: string, format: date }
+                localidadId: { type: integer, minimum: 1 }
+                brigadistaId: { type: integer, minimum: 1 }
+                maxParadas: { type: integer, minimum: 1, maximum: 60, default: 20 }
+                inicio:
+                  type: object
+                  required: [latitud, longitud]
+                  properties:
+                    latitud: { type: number }
+                    longitud: { type: number }
+      responses:
+        '201':
+          description: Ruta generada, con paradas ordenadas y distancia estimada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Exito' }
+        '400': { $ref: '#/components/responses/SolicitudInvalida' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '422':
+          description: Sin manzanas pendientes, localidad faltante o brigadista inválido
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    get:
+      operationId: listarRutas
+      summary: Lista rutas (el brigadista solo ve las asignadas)
+      tags: [Rutas]
+      security:
+        - institucional: []
+      parameters:
+        - $ref: '#/components/parameters/Limite'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/LocalidadId'
+        - { name: fecha, in: query, schema: { type: string, format: date } }
+        - { name: estado, in: query, schema: { $ref: '#/components/schemas/EstadoRuta' } }
+      responses:
+        '200':
+          description: Página de rutas con su avance
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExitoPaginado' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+
+  /institucional/rutas/{id}:
+    get:
+      operationId: obtenerRuta
+      summary: Detalle de la ruta con paradas y coordenadas
+      tags: [Rutas]
+      security:
+        - institucional: []
+      parameters:
+        - $ref: '#/components/parameters/IdEntero'
+      responses:
+        '200':
+          description: Ruta
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Exito' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+
+  /institucional/rutas/{id}/estado:
+    patch:
+      operationId: cambiarEstadoRuta
+      summary: Inicia, finaliza o cancela una ruta
+      description: 'Permiso `rutas:ejecutar`. PLANIFICADA → EN_CURSO → FINALIZADA; cancelar solo lo puede el coordinador.'
+      tags: [Rutas]
+      security:
+        - institucional: []
+      parameters:
+        - $ref: '#/components/parameters/IdEntero'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [estado]
+              properties:
+                estado: { type: string, enum: [EN_CURSO, FINALIZADA, CANCELADA] }
+      responses:
+        '200':
+          description: Estado actualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Exito' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409': { $ref: '#/components/responses/Conflicto' }
+
+  /institucional/rutas/{id}/paradas/{paradaId}/visitada:
+    patch:
+      operationId: marcarParadaVisitada
+      summary: Marca una parada como visitada (idempotente)
+      tags: [Rutas]
+      security:
+        - institucional: []
+      parameters:
+        - $ref: '#/components/parameters/IdEntero'
+        - { name: paradaId, in: path, required: true, schema: { type: integer, minimum: 1 } }
+      responses:
+        '200':
+          description: Parada visitada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Exito' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409': { $ref: '#/components/responses/Conflicto' }
+
+  /institucional/metricas:
+    get:
+      operationId: obtenerMetricas
+      summary: Métricas epidemiológicas agregadas
+      tags: [Métricas]
+      security:
+        - institucional: []
+      parameters:
+        - $ref: '#/components/parameters/Desde'
+        - $ref: '#/components/parameters/Hasta'
+        - $ref: '#/components/parameters/LocalidadId'
+      responses:
+        '200':
+          description: Reportes por tipo y estado, manzanas por color, intervenciones y serie diaria
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Exito' }
+        '400': { $ref: '#/components/responses/SolicitudInvalida' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+
+  /institucional/mapa-calor:
+    get:
+      operationId: obtenerMapaCalor
+      summary: Mapa de calor de riesgo (consulta al motor predictivo)
+      tags: [Métricas]
+      security:
+        - institucional: []
+      parameters:
+        - $ref: '#/components/parameters/Desde'
+        - $ref: '#/components/parameters/Hasta'
+        - $ref: '#/components/parameters/LocalidadId'
+      responses:
+        '200':
+          description: FeatureCollection de puntos con `indiceRiesgo` entre 0 y 1
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Exito'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/ColeccionGeoJson' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '502':
+          description: El motor predictivo devolvió un error
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '503': { $ref: '#/components/responses/NoDisponible' }
+
+  /institucional/exportaciones/reportes:
+    get:
+      operationId: exportarReportes
+      summary: Exporta reportes en CSV
+      description: |
+        Permiso `exportaciones:descargar`. Queda auditada. Solo ADMINISTRADOR recibe coordenadas exactas;
+        el resto, redondeadas a 3 decimales (≈ 110 m). Nunca incluye datos de la sesión ciudadana.
+      tags: [Exportaciones]
+      security:
+        - institucional: []
+      parameters:
+        - $ref: '#/components/parameters/Desde'
+        - $ref: '#/components/parameters/Hasta'
+        - $ref: '#/components/parameters/LocalidadId'
+      responses:
+        '200':
+          description: CSV en UTF-8 con BOM
+          content:
+            text/csv:
+              schema: { type: string }
+        '400': { $ref: '#/components/responses/SolicitudInvalida' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+
+  /institucional/exportaciones/intervenciones:
+    get:
+      operationId: exportarIntervenciones
+      summary: Exporta intervenciones en CSV
+      tags: [Exportaciones]
+      security:
+        - institucional: []
+      parameters:
+        - $ref: '#/components/parameters/Desde'
+        - $ref: '#/components/parameters/Hasta'
+        - $ref: '#/components/parameters/LocalidadId'
+      responses:
+        '200':
+          description: CSV en UTF-8 con BOM
+          content:
+            text/csv:
+              schema: { type: string }
+        '400': { $ref: '#/components/responses/SolicitudInvalida' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+
+  /institucional/usuarios:
+    post:
+      operationId: crearUsuario
+      summary: Crea un usuario institucional
+      description: |
+        Permiso `usuarios:gestionar`. COORDINADOR_BRIGADA y BRIGADISTA requieren `localidadId`;
+        los roles provinciales no la admiten. Contraseña: 12 a 128 caracteres, con mayúscula, minúscula y número.
+      tags: [Usuarios]
+      security:
+        - institucional: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nombre, apellido, email, password, rol]
+              properties:
+                nombre: { type: string, minLength: 2, maxLength: 80 }
+                apellido: { type: string, minLength: 2, maxLength: 80 }
+                email: { type: string, format: email }
+                password: { type: string, minLength: 12, maxLength: 128 }
+                rol: { $ref: '#/components/schemas/Rol' }
+                localidadId: { type: integer, minimum: 1 }
+      responses:
+        '201':
+          description: Usuario creado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Exito' }
+        '400': { $ref: '#/components/responses/SolicitudInvalida' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '409': { $ref: '#/components/responses/Conflicto' }
+        '422':
+          description: Rol y localidad incompatibles
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    get:
+      operationId: listarUsuarios
+      summary: Lista usuarios institucionales
+      tags: [Usuarios]
+      security:
+        - institucional: []
+      parameters:
+        - $ref: '#/components/parameters/Limite'
+        - $ref: '#/components/parameters/Cursor'
+        - { name: rol, in: query, schema: { $ref: '#/components/schemas/Rol' } }
+        - { name: localidadId, in: query, schema: { type: integer, minimum: 1 } }
+      responses:
+        '200':
+          description: Página de usuarios
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExitoPaginado' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+
+  /institucional/usuarios/{id}:
+    patch:
+      operationId: actualizarUsuario
+      summary: Cambia rol, localidad o estado de un usuario
+      description: Cualquier cambio de privilegios revoca las sesiones abiertas del usuario.
+      tags: [Usuarios]
+      security:
+        - institucional: []
+      parameters:
+        - $ref: '#/components/parameters/IdEntero'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                rol: { $ref: '#/components/schemas/Rol' }
+                localidadId: { type: [integer, 'null'], minimum: 1 }
+                activo: { type: boolean }
+      responses:
+        '200':
+          description: Usuario actualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Exito' }
+        '400': { $ref: '#/components/responses/SolicitudInvalida' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '422':
+          description: Cambio no permitido (por ejemplo, desactivarse a sí mismo)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /institucional/auditoria:
+    get:
+      operationId: listarAuditoria
+      summary: Registro de accesos a datos sensibles
+      description: 'Permiso `auditoria:leer` (ADMINISTRADOR y AUDITOR).'
+      tags: [Auditoría]
+      security:
+        - institucional: []
+      parameters:
+        - $ref: '#/components/parameters/Limite'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Desde'
+        - $ref: '#/components/parameters/Hasta'
+        - { name: usuarioId, in: query, schema: { type: integer, minimum: 1 } }
+        - { name: accion, in: query, schema: { type: string, pattern: '^[A-Z_]+$', example: EXPORTAR_CSV } }
+      responses:
+        '200':
+          description: Página de registros de auditoría
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExitoPaginado' }
+        '400': { $ref: '#/components/responses/SolicitudInvalida' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+
+  # ---------------------------------------------------------------------------
+  # Interno
+  # ---------------------------------------------------------------------------
+  /interno/manzanas/recalcular:
+    post:
+      operationId: recalcularEstadosManzanas
+      summary: Recalcula el color de las manzanas (tras lluvia o vencimiento)
+      tags: [Interno]
+      security:
+        - servicioInterno: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                localidadId: { type: integer, minimum: 1 }
+      responses:
+        '200':
+          description: Resultado del recálculo
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Exito'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          revisadas: { type: integer }
+                          actualizadas: { type: integer }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+
+components:
+  securitySchemes:
+    sesionAnonima:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token de `POST /sesiones` (audiencia `ciudadania`).
+    institucional:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token de `POST /auth/login` (audiencia `institucional`, 15 minutos).
+    cookieRefresco:
+      type: apiKey
+      in: cookie
+      name: rcf_refresco
+    servicioInterno:
+      type: apiKey
+      in: header
+      name: x-clave-servicio
+
+  parameters:
+    Limite:
+      name: limite
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+    Cursor:
+      name: cursor
+      in: query
+      description: Valor de `pagination.siguienteCursor` de la página anterior.
+      schema: { type: string, maxLength: 100 }
+    Desde:
+      name: desde
+      in: query
+      description: Por defecto, 30 días antes de `hasta`. El rango máximo es de 366 días.
+      schema: { type: string, format: date-time }
+    Hasta:
+      name: hasta
+      in: query
+      description: Por defecto, el momento actual.
+      schema: { type: string, format: date-time }
+    LocalidadId:
+      name: localidadId
+      in: query
+      description: Para roles locales solo se admite su propia localidad (otra responde 403).
+      schema: { type: integer, minimum: 1 }
+    IdUuid:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    IdEntero:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+
+  responses:
+    SolicitudInvalida:
+      description: Datos inválidos
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NoAutenticado:
+      description: Falta el token o es inválido, está vencido o pertenece a un usuario inhabilitado
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    SinPermiso:
+      description: El rol no tiene el permiso requerido o se pidió otra localidad
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NoEncontrado:
+      description: No existe o está fuera del alcance territorial del usuario
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Conflicto:
+      description: Transición de estado inválida, modificación concurrente o recurso duplicado
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    DemasiadasSolicitudes:
+      description: Límite de tasa superado
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NoDisponible:
+      description: Dependencia no disponible
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    Exito:
+      type: object
+      required: [status, data]
+      properties:
+        status: { type: string, const: success }
+        data: {}
+    ExitoPaginado:
+      type: object
+      required: [status, data, pagination]
+      properties:
+        status: { type: string, const: success }
+        data: { type: array, items: {} }
+        pagination: { $ref: '#/components/schemas/Paginacion' }
+    Paginacion:
+      type: object
+      required: [limite, siguienteCursor]
+      properties:
+        limite: { type: integer }
+        siguienteCursor: { type: [string, 'null'] }
+    Error:
+      type: object
+      required: [status, message]
+      properties:
+        status: { type: string, const: error }
+        message: { type: string }
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              campo: { type: string }
+              mensaje: { type: string }
+    TipoReporte:
+      type: string
+      enum: [CRIADERO, MICROBASURAL, LIMPIEZA]
+    OrigenReporte:
+      type: string
+      enum: [PWA, CHAT]
+      default: PWA
+    EstadoReporte:
+      type: string
+      enum: [PENDIENTE, VALIDADO, RECHAZADO, RESUELTO]
+    EstadoManzana:
+      type: string
+      enum: [SIN_DATOS, VERDE, AMARILLO, ROJO]
+    TipoIntervencion:
+      type: string
+      enum: [APLICACION_BTI, FUMIGACION, DESCACHARRADO, INSPECCION]
+    EstadoRuta:
+      type: string
+      enum: [PLANIFICADA, EN_CURSO, FINALIZADA, CANCELADA]
+    Rol:
+      type: string
+      enum: [ADMINISTRADOR, EPIDEMIOLOGO, COORDINADOR_BRIGADA, BRIGADISTA, AUDITOR]
+    ReporteResumen:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        idCliente: { type: string, format: uuid }
+        tipo: { $ref: '#/components/schemas/TipoReporte' }
+        estado: { $ref: '#/components/schemas/EstadoReporte' }
+        capturadoEn: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+        manzana:
+          type: [object, 'null']
+          properties:
+            id: { type: integer }
+            codigo: { type: string }
+            estado: { $ref: '#/components/schemas/EstadoManzana' }
+    RespuestaReporteResumen:
+      allOf:
+        - $ref: '#/components/schemas/Exito'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/ReporteResumen' }
+    UsuarioPublico:
+      type: object
+      properties:
+        id: { type: integer }
+        nombre: { type: string }
+        apellido: { type: string }
+        email: { type: string, format: email }
+        rol: { $ref: '#/components/schemas/Rol' }
+        localidadId: { type: [integer, 'null'] }
+    ColeccionGeoJson:
+      type: object
+      required: [type, features]
+      properties:
+        type: { type: string, const: FeatureCollection }
+        features:
+          type: array
+          items:
+            type: object
+            properties:
+              type: { type: string, const: Feature }
+              geometry: { type: object }
+              properties: { type: object }

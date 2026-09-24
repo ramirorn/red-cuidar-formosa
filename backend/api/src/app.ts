@@ -2,7 +2,8 @@ import express, { type NextFunction, type Request, type Response } from "express
 import cors from "cors";
 import helmet from "helmet";
 import cookieParser from "cookie-parser";
-import entorno from "./config/entorno.js";
+import { fileURLToPath } from "node:url";
+import entorno, { esProduccion } from "./config/entorno.js";
 import prisma from "./config/prisma.js";
 import { limiteGeneral } from "./middlewares/limiteTasa.middleware.js";
 
@@ -28,6 +29,14 @@ app.get("/api/salud", async (_req: Request, res: Response) => {
         res.status(503).json({ status: "error", message: "Base de datos no disponible" });
     }
 });
+
+// Contrato OpenAPI, publicado solo fuera de producción.
+if (!esProduccion) {
+    const rutaContrato = fileURLToPath(new URL("../openapi.yaml", import.meta.url));
+    app.get("/api/documentacion/openapi.yaml", (_req: Request, res: Response) => {
+        res.type("application/yaml").sendFile(rutaContrato);
+    });
+}
 
 app.use("/api", router);
 
