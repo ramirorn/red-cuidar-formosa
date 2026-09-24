@@ -4,7 +4,7 @@ import prisma from '../config/prisma.js';
 import { esRolProvincial } from '../config/permisos.js';
 import type { UsuarioAutenticado } from '../middlewares/autenticacion.middleware.js';
 import { ErrorHttp } from '../utils/errorHttp.js';
-import { armarPagina, decodificarCursor } from '../utils/paginacion.js';
+import { armarPagina, decodificarCursorEntero } from '../utils/paginacion.js';
 import { COSTO_BCRYPT, revocarSesionesUsuarioService } from './auth.services.js';
 
 const seleccionUsuario = {
@@ -72,7 +72,7 @@ export const listarUsuariosService = async (filtros: { rol?: Rol; localidadId?: 
         select: seleccionUsuario,
         orderBy: { id: 'asc' },
         take: filtros.limite + 1,
-        ...(filtros.cursor ? { cursor: { id: Number(decodificarCursor(filtros.cursor)) }, skip: 1 } : {}),
+        ...(filtros.cursor ? { cursor: { id: decodificarCursorEntero(filtros.cursor) }, skip: 1 } : {}),
     });
 
     return armarPagina(usuarios, filtros.limite);

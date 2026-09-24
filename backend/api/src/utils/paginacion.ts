@@ -8,9 +8,20 @@ export const LIMITE_MAXIMO = 200;
 
 export const codificarCursor = (id: string | number): string => Buffer.from(String(id)).toString('base64url');
 
+const FORMATO_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Un cursor manipulado se rechaza con 400 antes de llegar a la base de datos.
 export const decodificarCursor = (cursor: string): string => {
     const valor = Buffer.from(cursor, 'base64url').toString('utf8');
-    if (!valor || valor.length > 64) {
+    if (!FORMATO_UUID.test(valor)) {
+        throw new ErrorHttp(400, 'Cursor de paginación inválido');
+    }
+    return valor;
+};
+
+export const decodificarCursorEntero = (cursor: string): number => {
+    const valor = Number(Buffer.from(cursor, 'base64url').toString('utf8'));
+    if (!Number.isSafeInteger(valor) || valor < 1) {
         throw new ErrorHttp(400, 'Cursor de paginación inválido');
     }
     return valor;

@@ -145,3 +145,15 @@ describe('recepción de evidencia', () => {
         expect(respuesta.status).toBe(413);
     });
 });
+
+describe('paginación', () => {
+    it('rechaza un cursor manipulado con 400 sin consultar la base', async () => {
+        bd.usuario.findUnique.mockResolvedValue(usuarioActivo('ADMINISTRADOR', null));
+        const cursor = Buffer.from("' OR 1=1 --").toString('base64url');
+        const respuesta = await request(app)
+            .get(`/api/institucional/reportes?cursor=${cursor}`)
+            .set('Authorization', `Bearer ${tokenInstitucional(7)}`);
+        expect(respuesta.status).toBe(400);
+        expect(bd.reporte.findMany).not.toHaveBeenCalled();
+    });
+});
