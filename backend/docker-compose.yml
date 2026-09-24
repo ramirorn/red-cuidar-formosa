@@ -60,6 +60,10 @@ services:
       DIR_EVIDENCIAS: /datos/evidencias
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       URL_MOTOR_PREDICTIVO: http://motor-predictivo:8000
+      URL_CHAT_ORQUESTADOR: http://n8n:5678/webhook/chat-mosquito
+      VAPID_CLAVE_PUBLICA: ${VAPID_CLAVE_PUBLICA:-}
+      VAPID_CLAVE_PRIVADA: ${VAPID_CLAVE_PRIVADA:-}
+      VAPID_CONTACTO: ${VAPID_CONTACTO:-mailto:salud@redcuidar.local}
       SEMILLA_ADMIN_EMAIL: ${SEMILLA_ADMIN_EMAIL:-}
       SEMILLA_ADMIN_PASSWORD: ${SEMILLA_ADMIN_PASSWORD:-}
       SEMILLA_MANZANAS_EJEMPLO: ${SEMILLA_MANZANAS_EJEMPLO:-false}
@@ -119,6 +123,8 @@ services:
       N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
       # Variables que leen los flujos con $env.
       URL_API: http://api:3000/api
+      URL_MOTOR_PREDICTIVO: http://motor-predictivo:8000
+      URL_API_CLIMA: ${URL_API_CLIMA:-https://api.open-meteo.com}
       CLAVE_SERVICIO_INTERNO: ${CLAVE_SERVICIO_INTERNO}
       URL_OLLAMA: ${URL_OLLAMA:-http://host.docker.internal:11434}
       MODELO_OLLAMA: ${MODELO_OLLAMA:-nemotron-3-nano:4b}
@@ -127,6 +133,7 @@ services:
     volumes:
       - datos_n8n:/home/node/.n8n
       - ./orquestador/n8n/flujos:/flujos:ro
+      - ./orquestador/n8n/importar.sh:/orquestador/importar.sh:ro
     # Permite llegar a Ollama corriendo en la computadora anfitriona.
     extra_hosts:
       - "host.docker.internal:host-gateway"

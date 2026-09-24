@@ -1,0 +1,321 @@
+{
+  "id": "rcfClimaAlertas1",
+  "name": "Clima y alertas post-lluvia",
+  "active": false,
+  "nodes": [
+    {
+      "id": "d5f6278c-e805-5199-b550-d7ec06874297",
+      "name": "Cada hora",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1,
+              "triggerAtMinute": 5
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "32be989a-997f-5630-838f-3a56b644d0c2",
+      "name": "Ejecución manual",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        200
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "2dd3c972-857d-54f7-a983-4eeb2c07f606",
+      "name": "Localidades",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        240,
+        100
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \"id\" AS \"localidadId\", \"nombre\", ST_Y(\"centroide\") AS \"latitud\", ST_X(\"centroide\") AS \"longitud\"\nFROM \"localidad\" WHERE \"centroide\" IS NOT NULL ORDER BY \"id\"",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "rcfPostgresN8n01",
+          "name": "PostgreSQL Red Cuidar (rol_n8n)"
+        }
+      }
+    },
+    {
+      "id": "0f8d53f9-1d4c-5a8e-b6a9-5569c9e0e8e5",
+      "name": "Consultar Open-Meteo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        100
+      ],
+      "parameters": {
+        "url": "={{ $env.URL_API_CLIMA }}/v1/forecast",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "latitude",
+              "value": "={{ $json.latitud }}"
+            },
+            {
+              "name": "longitude",
+              "value": "={{ $json.longitud }}"
+            },
+            {
+              "name": "hourly",
+              "value": "precipitation,temperature_2m,relative_humidity_2m"
+            },
+            {
+              "name": "past_days",
+              "value": "2"
+            },
+            {
+              "name": "forecast_days",
+              "value": "3"
+            },
+            {
+              "name": "timezone",
+              "value": "UTC"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "5ca07703-872e-5700-900c-e8fb1db4edac",
+      "name": "Normalizar datos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        100
+      ],
+      "parameters": {
+        "jsCode": "// Une cada respuesta de Open-Meteo con su localidad y arma una sola lista de filas horarias.\n// Las horas ya transcurridas son observaciones; las futuras, pronóstico.\nconst localidades = $('Localidades').all();\nconst ahora = Date.now();\nconst filas = [];\n\n$input.all().forEach((item, indice) => {\n  const localidadId = localidades[indice]?.json.localidadId;\n  const horario = item.json.hourly ?? {};\n  if (!localidadId) return;\n\n  (horario.time ?? []).forEach((hora, j) => {\n    const precipitacion = horario.precipitation?.[j];\n    if (precipitacion === null || precipitacion === undefined) return;\n    const instante = new Date(`${hora}Z`);\n    filas.push({\n      localidadId,\n      observadoEn: instante.toISOString(),\n      precipitacionMm: precipitacion,\n      temperaturaC: horario.temperature_2m?.[j] ?? null,\n      humedadRelativa: horario.relative_humidity_2m?.[j] ?? null,\n      esPronostico: instante.getTime() > ahora,\n    });\n  });\n});\n\nreturn [{ json: { filas, cantidad: filas.length } }];\n"
+      }
+    },
+    {
+      "id": "f102d341-961c-5cfb-bd61-abf8c2dda4dd",
+      "name": "Guardar clima",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        960,
+        100
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO \"registroMeteorologico\"\n  (\"localidadId\", \"observadoEn\", \"precipitacionMm\", \"temperaturaC\", \"humedadRelativa\", \"esPronostico\", \"fuente\")\nSELECT (f->>'localidadId')::int,\n       ((f->>'observadoEn')::timestamptz AT TIME ZONE 'UTC'),\n       (f->>'precipitacionMm')::float8,\n       (f->>'temperaturaC')::float8,\n       (f->>'humedadRelativa')::float8,\n       (f->>'esPronostico')::boolean,\n       'open-meteo'\nFROM jsonb_array_elements($1::jsonb) AS f\nON CONFLICT (\"localidadId\", \"observadoEn\", \"esPronostico\", \"fuente\") DO UPDATE SET\n  \"precipitacionMm\" = EXCLUDED.\"precipitacionMm\",\n  \"temperaturaC\" = EXCLUDED.\"temperaturaC\",\n  \"humedadRelativa\" = EXCLUDED.\"humedadRelativa\"",
+        "options": {
+          "queryReplacement": "={{ [JSON.stringify($json.filas)] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "rcfPostgresN8n01",
+          "name": "PostgreSQL Red Cuidar (rol_n8n)"
+        }
+      }
+    },
+    {
+      "id": "8c4e3f21-d945-533f-a69c-d9ffa7b5eb9b",
+      "name": "Lluvia últimas 24 h",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1200,
+        100
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \"localidadId\", ROUND(SUM(\"precipitacionMm\")::numeric, 1)::float8 AS \"precipitacionMm\"\nFROM \"registroMeteorologico\"\nWHERE \"esPronostico\" = false AND \"fuente\" = 'open-meteo'\n  AND \"observadoEn\" > (now() AT TIME ZONE 'UTC') - interval '24 hours'\nGROUP BY \"localidadId\"\nHAVING SUM(\"precipitacionMm\") >= 10",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "rcfPostgresN8n01",
+          "name": "PostgreSQL Red Cuidar (rol_n8n)"
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "4b8b626e-3699-5847-a279-a669e73be620",
+      "name": "Recalcular manzanas",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1440,
+        100
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.URL_API }}/interno/manzanas/recalcular",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ localidadId: $json.localidadId }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "rcfClaveServici1",
+          "name": "Clave de servicio interno"
+        }
+      }
+    },
+    {
+      "id": "7ac2bd49-ed61-5371-8713-be0f09b8cf0e",
+      "name": "Enviar alerta Web Push",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1680,
+        100
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.URL_API }}/interno/notificaciones/lluvia",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ localidadId: $('Lluvia últimas 24 h').item.json.localidadId, precipitacionMm: $('Lluvia últimas 24 h').item.json.precipitacionMm }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "rcfClaveServici1",
+          "name": "Clave de servicio interno"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Cada hora": {
+      "main": [
+        [
+          {
+            "node": "Localidades",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ejecución manual": {
+      "main": [
+        [
+          {
+            "node": "Localidades",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Localidades": {
+      "main": [
+        [
+          {
+            "node": "Consultar Open-Meteo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar Open-Meteo": {
+      "main": [
+        [
+          {
+            "node": "Normalizar datos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar datos": {
+      "main": [
+        [
+          {
+            "node": "Guardar clima",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar clima": {
+      "main": [
+        [
+          {
+            "node": "Lluvia últimas 24 h",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lluvia últimas 24 h": {
+      "main": [
+        [
+          {
+            "node": "Recalcular manzanas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recalcular manzanas": {
+      "main": [
+        [
+          {
+            "node": "Enviar alerta Web Push",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Argentina/Buenos_Aires",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "all"
+  },
+  "pinData": {},
+  "tags": []
+}

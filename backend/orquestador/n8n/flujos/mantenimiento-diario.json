@@ -1,0 +1,133 @@
+{
+  "id": "rcfMantenimient1",
+  "name": "Mantenimiento diario",
+  "active": false,
+  "nodes": [
+    {
+      "id": "90e1d78b-bff3-585f-80fa-29935da7ea52",
+      "name": "Todos los días 03:10",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1,
+              "triggerAtHour": 3,
+              "triggerAtMinute": 10
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "32be989a-997f-5630-838f-3a56b644d0c2",
+      "name": "Ejecución manual",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        200
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "9d3d2817-fe63-5d31-8937-fa6d16f35b11",
+      "name": "Recalcular todas las manzanas",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        100
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.URL_API }}/interno/manzanas/recalcular",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({}) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "rcfClaveServici1",
+          "name": "Clave de servicio interno"
+        }
+      }
+    },
+    {
+      "id": "6b88abe3-3adb-5505-801c-3ec7e18634bf",
+      "name": "Borrar sesiones inactivas",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        480,
+        100
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Sus suscripciones y triajes se borran en cascada; los reportes se conservan sin la sesión.\nWITH borradas AS (\n  DELETE FROM \"sesionAnonima\"\n  WHERE \"ultimaActividadEn\" < (now() AT TIME ZONE 'UTC') - interval '30 days'\n  RETURNING 1\n)\nSELECT COUNT(*)::int AS \"sesionesBorradas\" FROM borradas",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "rcfPostgresN8n01",
+          "name": "PostgreSQL Red Cuidar (rol_n8n)"
+        }
+      },
+      "executeOnce": true
+    }
+  ],
+  "connections": {
+    "Todos los días 03:10": {
+      "main": [
+        [
+          {
+            "node": "Recalcular todas las manzanas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ejecución manual": {
+      "main": [
+        [
+          {
+            "node": "Recalcular todas las manzanas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recalcular todas las manzanas": {
+      "main": [
+        [
+          {
+            "node": "Borrar sesiones inactivas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Argentina/Buenos_Aires",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "all"
+  },
+  "pinData": {},
+  "tags": []
+}

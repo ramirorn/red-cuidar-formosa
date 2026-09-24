@@ -22,6 +22,9 @@ docker compose up --build -d
 docker compose exec api npm run semilla   # localidades, primer administrador y grilla de ejemplo
 ```
 
+- Flujos de n8n: `docker compose exec n8n sh /orquestador/importar.sh && docker compose restart n8n`
+  (ver `orquestador/README.md`).
+- Web Push: generar las claves con `cd api && npm run generar-vapid` y cargarlas en `.env`.
 - Ollama corre por defecto en la computadora anfitriona (`ollama pull nemotron-3-nano:4b`).
   Para correrlo dentro de Docker: `docker compose --profile ollama-contenedor up -d` y
   `URL_OLLAMA=http://ollama:11434` en `.env`.
