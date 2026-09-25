@@ -1,6 +1,6 @@
 import { Prisma, type ClaseObjeto, type EstadoReporte, type OrigenReporte, type TipoReporte } from '@prisma/client';
 import prisma from '../config/prisma.js';
-import { ROLES_COORDENADAS_EXACTAS } from '../config/permisos.js';
+import { esRolProvincial, ROLES_COORDENADAS_EXACTAS } from '../config/permisos.js';
 import type { UsuarioAutenticado } from '../middlewares/autenticacion.middleware.js';
 import { alcanceLocalidad, verificarAlcance } from '../utils/alcance.js';
 import { ErrorHttp } from '../utils/errorHttp.js';
@@ -16,11 +16,9 @@ import { recalcularEstadoManzanaService } from './manzana.services.js';
 import { invalidarCacheMapaCalorService } from './mapaCalor.services.js';
 import { registrarActividadSesionService } from './sesion.services.js';
 
-// Un reporte se valida automáticamente si la IA del dispositivo alcanzó esta confianza.
-// Para CRIADERO y MICROBASURAL es la confianza de haber detectado el peligro;
-// para LIMPIEZA, la de que el lugar quedó sin recipientes peligrosos.
-export const UMBRAL_VALIDACION_AUTOMATICA = 0.6;
-
+// Todo reporte ciudadano entra PENDIENTE y solo lo valida una persona con permiso `reportes:validar`.
+// La confianza de la IA la informa el propio dispositivo (el cliente la controla), así que solo se usa
+// para priorizar la bandeja de revisión, nunca para cambiar el estado de una manzana.
 const TIPOS_PELIGRO: TipoReporte[] = ['CRIADERO', 'MICROBASURAL'];
 
 export interface DeteccionEntrada {
@@ -58,9 +56,6 @@ const buscarPorIdCliente = (sesionId: string, idCliente: string) => prisma.repor
     select: seleccionResumen,
 });
 
-export const estadoInicialReporte = (confianzaIa?: number): EstadoReporte =>
-    confianzaIa !== undefined && confianzaIa >= UMBRAL_VALIDACION_AUTOMATICA ? 'VALIDADO' : 'PENDIENTE';
-
 // ---------------------------------------------------------------------------
 // Ciudadanía: recepción de evidencia y sincronización
 // ---------------------------------------------------------------------------
@@ -75,9 +70,9 @@ export const crearReporteService = async (sesionId: string, datos: DatosReporte,
         throw new ErrorHttp(400, 'Debe adjuntar al menos una imagen como evidencia');
     }
 
-    let reporteAResolver: { id: string; manzanaId: number | null } | null = null;
+    // El criadero a cerrar debe ser de la misma sesión; se cierra recién cuando una persona valide la limpieza.
     if (datos.reporteResueltoId) {
-        reporteAResolver = await prisma.reporte.findFirst({
+        const reporteAResolver = await prisma.reporte.findFirst({
             where: {
                 id: datos.reporteResueltoId,
                 sesionId,
@@ -111,7 +106,7 @@ export const crearReporteService = async (sesionId: string, datos: DatosReporte,
             rutas.push(await guardarImagenService(imagen.contenido));
         }
 
-        const estado = estadoInicialReporte(datos.confianzaIa);
+        const estado: EstadoReporte = 'PENDIENTE';
         const momento = datos.tipo === 'LIMPIEZA' ? 'DESPUES' : 'ANTES';
 
         const resultado = await prisma.$transaction(async (tx) => {
@@ -164,29 +159,18 @@ export const crearReporteService = async (sesionId: string, datos: DatosReporte,
                 });
             }
 
-            const manzanasAfectadas = new Set<number>();
-
+            // Un reporte pendiente no pinta de rojo ni de verde: a lo sumo deja la manzana en AMARILLO ("revisar").
+            let huboCambioDeEstado = false;
             if (insertado.manzanaId !== null) {
-                manzanasAfectadas.add(insertado.manzanaId);
                 await tx.manzana.update({
                     where: { id: insertado.manzanaId },
                     data: { ultimoReporteEn: new Date() },
                 });
-            }
-
-            // Una limpieza validada cierra el criadero que el mismo vecino había reportado.
-            if (reporteAResolver && estado === 'VALIDADO') {
-                await tx.reporte.update({ where: { id: reporteAResolver.id }, data: { estado: 'RESUELTO' } });
-                if (reporteAResolver.manzanaId !== null) manzanasAfectadas.add(reporteAResolver.manzanaId);
-            }
-
-            let huboCambioDeEstado = false;
-            for (const manzanaId of manzanasAfectadas) {
-                const { cambio } = await recalcularEstadoManzanaService(tx, manzanaId, {
+                const { cambio } = await recalcularEstadoManzanaService(tx, insertado.manzanaId, {
                     motivo: `Reporte ciudadano de ${datos.tipo.toLowerCase()}`,
                     reporteId: insertado.id,
                 });
-                huboCambioDeEstado ||= cambio;
+                huboCambioDeEstado = cambio;
             }
 
             return { id: insertado.id, huboCambioDeEstado };
@@ -246,9 +230,16 @@ export interface FiltrosReportes {
     manzanaId?: number;
     desde?: Date;
     hasta?: Date;
+    orden?: 'recientes' | 'prioridad';
     limite: number;
     cursor?: string;
 }
+
+// "prioridad": primero lo que la IA del dispositivo detectó con más confianza (útil para la bandeja de pendientes).
+const ORDEN_REPORTES: Record<'recientes' | 'prioridad', Prisma.reporteOrderByWithRelationInput[]> = {
+    recientes: [{ createdAt: 'desc' }, { id: 'desc' }],
+    prioridad: [{ confianzaIa: { sort: 'desc', nulls: 'last' } }, { createdAt: 'desc' }, { id: 'desc' }],
+};
 
 export const filtroAlcanceReportes = (localidadId: number | null): Prisma.reporteWhereInput =>
     localidadId === null ? {} : { manzana: { localidadId } };
@@ -277,7 +268,7 @@ export const listarReportesService = async (usuario: UsuarioAutenticado, filtros
             manzana: { select: { id: true, codigo: true, estado: true, localidadId: true } },
             _count: { select: { evidencias: true, detecciones: true } },
         },
-        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        orderBy: ORDEN_REPORTES[filtros.orden ?? 'recientes'],
         take: filtros.limite + 1,
         ...(filtros.cursor ? { cursor: { id: decodificarCursor(filtros.cursor) }, skip: 1 } : {}),
     });
@@ -339,7 +330,14 @@ export const cambiarEstadoReporteService = async (
     const resultado = await prisma.$transaction(async (tx) => {
         const reporte = await tx.reporte.findUnique({
             where: { id },
-            select: { id: true, estado: true, tipo: true, manzanaId: true, manzana: { select: { localidadId: true } } },
+            select: {
+                id: true,
+                estado: true,
+                tipo: true,
+                manzanaId: true,
+                manzana: { select: { localidadId: true } },
+                reporteResuelto: { select: { id: true, manzanaId: true, manzana: { select: { localidadId: true } } } },
+            },
         });
 
         if (!reporte) throw new ErrorHttp(404, 'Recurso no encontrado');
@@ -361,14 +359,30 @@ export const cambiarEstadoReporteService = async (
         });
         if (count === 0) throw new ErrorHttp(409, 'El reporte fue modificado por otro usuario; recargue e intente nuevamente');
 
+        const manzanasAfectadas = new Set<number>();
+        if (reporte.manzanaId !== null) manzanasAfectadas.add(reporte.manzanaId);
+
+        // Validar una limpieza cierra el criadero que el vecino indicó, si sigue abierto y está en el alcance
+        // de quien valida. La condición sobre el estado evita reabrir un criadero rechazado mientras tanto.
+        const criadero = reporte.reporteResuelto;
+        if (nuevoEstado === 'VALIDADO' && reporte.tipo === 'LIMPIEZA' && criadero
+            && (esRolProvincial(usuario.rol) || criadero.manzana?.localidadId === usuario.localidadId)) {
+            const cierre = await tx.reporte.updateMany({
+                where: { id: criadero.id, estado: { in: ['PENDIENTE', 'VALIDADO'] } },
+                data: { estado: 'RESUELTO', validadoPorId: usuario.id, validadoEn: new Date() },
+            });
+            if (cierre.count > 0 && criadero.manzanaId !== null) manzanasAfectadas.add(criadero.manzanaId);
+        }
+
+        // Se bloquean las manzanas siempre en el mismo orden para evitar interbloqueos entre transacciones.
         let cambioManzana = false;
-        if (reporte.manzanaId !== null) {
-            const { cambio } = await recalcularEstadoManzanaService(tx, reporte.manzanaId, {
+        for (const manzanaId of [...manzanasAfectadas].sort((a, b) => a - b)) {
+            const { cambio } = await recalcularEstadoManzanaService(tx, manzanaId, {
                 motivo: `Reporte ${nuevoEstado.toLowerCase()} por personal institucional`,
                 reporteId: id,
                 usuarioId: usuario.id,
             });
-            cambioManzana = cambio;
+            cambioManzana ||= cambio;
         }
 
         return { id, estado: nuevoEstado, cambioManzana };

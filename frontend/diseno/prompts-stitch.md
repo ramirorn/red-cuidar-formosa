@@ -118,8 +118,7 @@ Contenido:
 - Botón primario verde a todo el ancho: "Enviar reporte".
 
 Estados después de enviar:
-- Éxito en línea: "¡Gracias! Tu reporte fue validado" (chip ROJO de la manzana).
-- Recibido para revisar: "Recibido. Lo va a revisar el equipo de salud" (chip gris "Pendiente").
+- Enviado: "¡Gracias! Recibimos tu reporte. El equipo de salud lo va a revisar" (chip gris "En revisión" y la manzana en AMARILLO).
 - Sin conexión: "Guardado. Lo enviamos cuando vuelva la señal" (ícono de nube con reloj).
 ```
 
@@ -133,7 +132,8 @@ Pantalla móvil para informar que el vecino eliminó un criadero (identidad del 
 - Comparación lado a lado: la foto "Antes" (del reporte elegido) y un espacio "Después" con el botón de cámara.
 - Recordatorio ilustrado de 4 pasos con iconos: Desechar, Dar vuelta, Tapar y Cepillar las paredes ("los huevos quedan pegados").
 - Botón primario: "Enviar limpieza".
-- Estado final festivo: la manzana pasa a VERDE con una animación de pintura verde sobre el polígono y el texto "¡Tu manzana está en verde! Gracias por cuidar a tus vecinos".
+- Estado final: "¡Gracias! Cuando el equipo de salud confirme tu limpieza, tu manzana se pinta de verde", con una ilustración del polígono a medio pintar y un chip "En revisión".
+- Variante para cuando ya se confirmó (se ve al volver a la app): animación de pintura verde sobre el polígono y el texto "¡Tu manzana está en verde! Gracias por cuidar a tus vecinos".
 ```
 
 ## Prompt 7 — Mis reportes y cola sin conexión
@@ -308,7 +308,7 @@ Pantalla web con el mapa de calor epidemiológico (identidad del Prompt 0 y estr
 Pantalla web con una tabla de reportes ciudadanos (identidad del Prompt 0 y estructura del Prompt 15).
 
 - Filtros arriba: Estado (Pendiente, Validado, Rechazado, Resuelto), Tipo (Criadero, Microbasural, Limpieza), Manzana, Localidad y Rango de fechas.
-- Pestañas con contador: "Pendientes de revisión (37)", "Todos".
+- Pestañas con contador: "Pendientes de revisión (37)", "Todos". En pendientes, un selector "Ordenar por: prioridad de la IA / más recientes": todo reporte ciudadano necesita la validación de una persona.
 - Tabla con columnas: miniatura de la foto, tipo, estado (chip), confianza de la IA (barra con porcentaje), manzana (código y chip de color), origen (PWA o Chat), capturado en, recibido en, cantidad de fotos y detecciones.
 - Acciones en cada fila: "Ver detalle", y "Validar" o "Rechazar" (solo para roles con permiso de validación).
 - Paginación con el botón "Cargar más" (cursor), 50 filas por página.

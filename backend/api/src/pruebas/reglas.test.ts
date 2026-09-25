@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { calcularEstadoManzana, type DatosEstadoManzana } from '../services/manzana.services.js';
-import { esTransicionValida, estadoInicialReporte } from '../services/reporte.services.js';
+import { esTransicionValida } from '../services/reporte.services.js';
 import { PERMISOS, PERMISOS_POR_ROL, tienePermiso } from '../config/permisos.js';
 import { alcanceLocalidad } from '../utils/alcance.js';
 import { escaparCsv } from '../utils/csv.js';
@@ -44,12 +44,6 @@ describe('calcularEstadoManzana', () => {
 });
 
 describe('ciclo de vida del reporte', () => {
-    it('valida automáticamente desde 0.6 de confianza de la IA', () => {
-        expect(estadoInicialReporte(0.6)).toBe('VALIDADO');
-        expect(estadoInicialReporte(0.59)).toBe('PENDIENTE');
-        expect(estadoInicialReporte(undefined)).toBe('PENDIENTE');
-    });
-
     it('no permite reabrir un reporte resuelto ni resolver una limpieza', () => {
         expect(esTransicionValida('RESUELTO', 'VALIDADO', 'CRIADERO')).toBe(false);
         expect(esTransicionValida('VALIDADO', 'RESUELTO', 'LIMPIEZA')).toBe(false);

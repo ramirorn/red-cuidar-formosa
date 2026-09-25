@@ -130,43 +130,47 @@ export const recalcularEstadoManzanaService = async (
 
 // Recalculo masivo: lo dispara n8n tras una lluvia y una vez por día (vencimiento de limpiezas).
 // Solo revisa manzanas con actividad; las SIN_DATOS cambian únicamente con un evento nuevo.
-// Costo fijo: 1 lectura + como máximo 4 actualizaciones + 1 inserción de historial.
+// No bloquea las filas mientras calcula: la actualización es condicional al estado leído, así que si
+// otra transacción cambió la manzana en el medio (por ejemplo, validó un criadero y la pasó a ROJO),
+// esa manzana se deja como está y no se pisa. Costo fijo: 1 lectura, 1 actualización y 1 inserción.
 export const recalcularEstadosService = async (localidadId?: number) => {
     const filtro = localidadId === undefined
         ? Prisma.sql`m."estado" <> 'SIN_DATOS'`
         : Prisma.sql`m."estado" <> 'SIN_DATOS' AND m."localidadId" = ${localidadId}`;
 
+    const filas = await obtenerDatosEstado(prisma, filtro);
+    const ahora = new Date();
+    const cambios = filas
+        .map((fila) => ({ id: fila.id, anterior: fila.estado, nuevo: calcularEstadoManzana(fila, ahora) }))
+        .filter((cambio) => cambio.nuevo !== cambio.anterior);
+
+    if (cambios.length === 0) return { revisadas: filas.length, actualizadas: 0 };
+
     return prisma.$transaction(async (tx) => {
-        const filas = await obtenerDatosEstado(tx, filtro);
-        const ahora = new Date();
-        const porEstado = new Map<EstadoManzana, number[]>();
-        const historial: Prisma.historialEstadoManzanaCreateManyInput[] = [];
+        const aplicados = await tx.$queryRaw<{ id: number; anterior: EstadoManzana; nuevo: EstadoManzana }[]>`
+            UPDATE "manzana" AS m
+            SET "estado" = v.nuevo::"EstadoManzana", "estadoActualizadoEn" = ${ahora}, "updatedAt" = ${ahora}
+            FROM (
+                SELECT unnest(${cambios.map((cambio) => cambio.id)}::int[]) AS id,
+                       unnest(${cambios.map((cambio) => cambio.anterior)}::text[]) AS anterior,
+                       unnest(${cambios.map((cambio) => cambio.nuevo)}::text[]) AS nuevo
+            ) AS v
+            WHERE m."id" = v.id AND m."estado" = v.anterior::"EstadoManzana"
+            RETURNING m."id", v.anterior::"EstadoManzana" AS anterior, v.nuevo::"EstadoManzana" AS nuevo
+        `;
 
-        for (const fila of filas) {
-            const nuevo = calcularEstadoManzana(fila, ahora);
-            if (nuevo === fila.estado) continue;
-
-            porEstado.set(nuevo, [...(porEstado.get(nuevo) ?? []), fila.id]);
-            historial.push({
-                manzanaId: fila.id,
-                estadoAnterior: fila.estado,
-                estadoNuevo: nuevo,
-                motivo: 'Recalculo programado (clima o vencimiento de limpieza)',
+        if (aplicados.length > 0) {
+            await tx.historialEstadoManzana.createMany({
+                data: aplicados.map((cambio) => ({
+                    manzanaId: cambio.id,
+                    estadoAnterior: cambio.anterior,
+                    estadoNuevo: cambio.nuevo,
+                    motivo: 'Recalculo programado (clima o vencimiento de limpieza)',
+                })),
             });
         }
 
-        for (const [estado, ids] of porEstado) {
-            await tx.manzana.updateMany({
-                where: { id: { in: ids } },
-                data: { estado, estadoActualizadoEn: ahora },
-            });
-        }
-
-        if (historial.length > 0) {
-            await tx.historialEstadoManzana.createMany({ data: historial });
-        }
-
-        return { revisadas: filas.length, actualizadas: historial.length };
+        return { revisadas: filas.length, actualizadas: aplicados.length };
     });
 };
 

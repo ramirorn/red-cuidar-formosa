@@ -82,7 +82,9 @@ Cada servicio se conecta con su propio rol (privilegio mínimo, ver `db/init` y 
 | AMARILLO | Hubo actividad, pero la limpieza venció, llovió después o hay reportes pendientes. |
 | SIN_DATOS | La manzana nunca tuvo reportes ni intervenciones. |
 
-Un reporte se valida solo si la IA del dispositivo informa una confianza ≥ 0,6; si no, queda PENDIENTE para revisión.
+Todo reporte ciudadano entra PENDIENTE (la manzana pasa a AMARILLO, "revisar") y **solo lo valida una persona**
+con permiso `reportes:validar`. La confianza de la IA la informa el dispositivo, así que únicamente ordena la bandeja
+de revisión (`orden=prioridad`). Una limpieza que indica `reporteResueltoId` cierra ese criadero recién cuando se valida.
 n8n dispara `POST /api/interno/manzanas/recalcular` después de cada lluvia y una vez por día.
 
 ### Índice de riesgo y predicción (motor predictivo)

@@ -7,6 +7,7 @@ import {
     app,
     crearSesion,
     crearTerritorio,
+    crearUsuario,
     enviarReporte,
     imagenUnica,
     limpiarBase,
@@ -28,6 +29,15 @@ const contarArchivos = (directorio = DIR_EVIDENCIAS): number => {
 let territorio: Territorio;
 let sesion: { sesionId: string; token: string };
 
+// Un epidemiólogo (alcance provincial) cambia el estado de un reporte.
+const cambiarEstado = async (reporteId: string, estado: string, motivoRechazo?: string) => {
+    const epidemiologo = await crearUsuario('EPIDEMIOLOGO');
+    return request(app)
+        .patch(`/api/institucional/reportes/${reporteId}/estado`)
+        .set('Authorization', `Bearer ${epidemiologo.token}`)
+        .send({ estado, ...(motivoRechazo ? { motivoRechazo } : {}) });
+};
+
 beforeEach(async () => {
     await limpiarBase();
     rmSync(DIR_EVIDENCIAS, { recursive: true, force: true });
@@ -36,19 +46,30 @@ beforeEach(async () => {
 });
 
 describe('recepción de reportes con PostGIS', () => {
-    it('asigna la manzana por ubicación, guarda la evidencia y pinta la manzana de ROJO', async () => {
+    it('asigna la manzana por ubicación y deja el reporte PENDIENTE con la manzana en AMARILLO', async () => {
         const respuesta = await enviarReporte(sesion.token, { ...puntoDe('capital-11'), confianzaIa: 0.9 });
 
         expect(respuesta.status).toBe(201);
-        expect(respuesta.body.data.estado).toBe('VALIDADO');
-        expect(respuesta.body.data.manzana).toMatchObject({ id: territorio.manzanas['capital-11'], estado: 'ROJO' });
+        expect(respuesta.body.data.estado).toBe('PENDIENTE');
+        expect(respuesta.body.data.manzana).toMatchObject({ id: territorio.manzanas['capital-11'], estado: 'AMARILLO' });
 
         const evidencias = await prisma.evidencia.findMany({ where: { reporteId: respuesta.body.data.id } });
         expect(evidencias).toHaveLength(1);
         expect(existsSync(path.join(DIR_EVIDENCIAS, evidencias[0]!.rutaAlmacenamiento))).toBe(true);
+    });
 
-        const historial = await prisma.historialEstadoManzana.findMany({ where: { manzanaId: territorio.manzanas['capital-11']! } });
-        expect(historial.map((cambio) => cambio.estadoNuevo)).toEqual(['ROJO']);
+    it('la confianza que informa el dispositivo no valida nada: la manzana solo pasa a ROJO cuando valida una persona', async () => {
+        const respuesta = await enviarReporte(sesion.token, { ...puntoDe('capital-11'), confianzaIa: 1 });
+        expect(respuesta.body.data.estado).toBe('PENDIENTE');
+        expect(respuesta.body.data.manzana.estado).toBe('AMARILLO');
+
+        const validacion = await cambiarEstado(respuesta.body.data.id, 'VALIDADO');
+
+        expect(validacion.status).toBe(200);
+        const manzana = await prisma.manzana.findUniqueOrThrow({ where: { id: territorio.manzanas['capital-11']! } });
+        expect(manzana.estado).toBe('ROJO');
+        const historial = await prisma.historialEstadoManzana.findMany({ where: { manzanaId: manzana.id }, orderBy: { id: 'asc' } });
+        expect(historial.map((cambio) => cambio.estadoNuevo)).toEqual(['AMARILLO', 'ROJO']);
     });
 
     it('guarda la ubicación exacta en la columna geography', async () => {
@@ -83,8 +104,9 @@ describe('recepción de reportes con PostGIS', () => {
         expect(guardada.exif).toBeUndefined();
     });
 
-    it('una limpieza validada resuelve el criadero del mismo vecino y pinta la manzana de VERDE', async () => {
+    it('al validar una limpieza se resuelve el criadero indicado y la manzana pasa a VERDE', async () => {
         const criadero = await enviarReporte(sesion.token, { ...puntoDe('capital-22'), confianzaIa: 0.8 });
+        await cambiarEstado(criadero.body.data.id, 'VALIDADO');
         const limpieza = await enviarReporte(sesion.token, {
             ...puntoDe('capital-22'),
             tipo: 'LIMPIEZA',
@@ -92,10 +114,32 @@ describe('recepción de reportes con PostGIS', () => {
             reporteResueltoId: criadero.body.data.id,
         });
 
+        // Mientras nadie valide la limpieza, el criadero sigue abierto y la manzana en ROJO.
         expect(limpieza.status).toBe(201);
-        expect(limpieza.body.data.manzana.estado).toBe('VERDE');
+        expect(limpieza.body.data.manzana.estado).toBe('ROJO');
+
+        const validacion = await cambiarEstado(limpieza.body.data.id, 'VALIDADO');
+
+        expect(validacion.status).toBe(200);
         const cerrado = await prisma.reporte.findUniqueOrThrow({ where: { id: criadero.body.data.id } });
         expect(cerrado.estado).toBe('RESUELTO');
+        const manzana = await prisma.manzana.findUniqueOrThrow({ where: { id: territorio.manzanas['capital-22']! } });
+        expect(manzana.estado).toBe('VERDE');
+    });
+
+    it('validar una limpieza no reabre un criadero que el equipo ya rechazó', async () => {
+        const criadero = await enviarReporte(sesion.token, puntoDe('capital-22'));
+        const limpieza = await enviarReporte(sesion.token, {
+            ...puntoDe('capital-22'),
+            tipo: 'LIMPIEZA',
+            reporteResueltoId: criadero.body.data.id,
+        });
+        await cambiarEstado(criadero.body.data.id, 'RECHAZADO', 'La foto no muestra agua');
+
+        await cambiarEstado(limpieza.body.data.id, 'VALIDADO');
+
+        const rechazado = await prisma.reporte.findUniqueOrThrow({ where: { id: criadero.body.data.id } });
+        expect(rechazado.estado).toBe('RECHAZADO');
     });
 
     it('no permite resolver el criadero de otra sesión', async () => {
@@ -111,7 +155,7 @@ describe('recepción de reportes con PostGIS', () => {
 
         expect(limpieza.status).toBe(422);
         const intacto = await prisma.reporte.findUniqueOrThrow({ where: { id: criadero.body.data.id } });
-        expect(intacto.estado).toBe('VALIDADO');
+        expect(intacto.estado).toBe('PENDIENTE');
     });
 });
 
@@ -181,7 +225,7 @@ describe('mapa comunitario', () => {
         expect(respuesta.status).toBe(200);
         const features = respuesta.body.data.features;
         expect(features).toHaveLength(9);
-        expect(features.find((feature: { id: number }) => feature.id === territorio.manzanas['capital-11']).properties.estado).toBe('ROJO');
+        expect(features.find((feature: { id: number }) => feature.id === territorio.manzanas['capital-11']).properties.estado).toBe('AMARILLO');
         expect(features[0].geometry.type).toBe('Polygon');
     });
 });

@@ -91,6 +91,7 @@ export const validarListarReportes = [
     query('estado').optional().isIn(Object.values(EstadoReporte)).withMessage('estado inválido'),
     query('tipo').optional().isIn(Object.values(TipoReporte)).withMessage('tipo inválido'),
     query('manzanaId').optional().isInt({ min: 1 }).withMessage('manzanaId inválido').toInt(),
+    query('orden').optional().isIn(['recientes', 'prioridad']).withMessage('orden debe ser recientes o prioridad'),
 ];
 
 export const validarObtenerReporte = [validarIdUuid];

@@ -105,7 +105,9 @@ paths:
         Responde 201 si lo crea y 200 con el mismo reporte si ya existía.
 
         Las imágenes se verifican por su firma binaria y se re-codifican sin metadatos EXIF.
-        Se valida automáticamente si `confianzaIa` ≥ 0,6.
+        Todo reporte entra PENDIENTE: solo lo valida el personal institucional. `confianzaIa` se usa
+        únicamente para priorizar la revisión. Una LIMPIEZA con `reporteResueltoId` cierra ese criadero
+        recién cuando se valida.
       tags: [Ciudadanía]
       security:
         - sesionAnonima: []
@@ -462,6 +464,10 @@ paths:
         - { name: estado, in: query, schema: { $ref: '#/components/schemas/EstadoReporte' } }
         - { name: tipo, in: query, schema: { $ref: '#/components/schemas/TipoReporte' } }
         - { name: manzanaId, in: query, schema: { type: integer, minimum: 1 } }
+        - name: orden
+          in: query
+          description: '`prioridad` ordena por la confianza de la IA (mayor primero), útil para revisar pendientes.'
+          schema: { type: string, enum: [recientes, prioridad], default: recientes }
       responses:
         '200':
           description: Página de reportes
