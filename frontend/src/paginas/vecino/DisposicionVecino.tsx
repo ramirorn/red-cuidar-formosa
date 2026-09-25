@@ -5,6 +5,8 @@ import { BotonEnlace } from '@/componentes/ui/Boton';
 import { useColaReportes } from '@/hooks/useColaReportes';
 import { useEnLinea } from '@/hooks/useEnLinea';
 import { useVolver } from '@/hooks/useVolver';
+import { leerAjuste } from '@/sinConexion/bd';
+import { obtenerManzanasDeLocalidad } from '@/sinConexion/manzanasLocales';
 import { cn } from '@/lib/utils';
 
 const NAVEGACION = [
@@ -29,6 +31,15 @@ const IndicadorConexion = () => {
     useEffect(() => {
         if (enLinea && pendientes > 0) void sincronizar({ silencioso: true });
     }, [enLinea, pendientes, sincronizar]);
+
+    // Con señal, se actualizan en segundo plano las manzanas de la localidad del vecino: así puede
+    // saber en qué manzana está (y reportar) aunque después se quede sin conexión.
+    useEffect(() => {
+        if (!enLinea) return;
+        void leerAjuste<number>('ultimaLocalidad').then((localidadId) => {
+            if (localidadId) void obtenerManzanasDeLocalidad(localidadId).catch(() => undefined);
+        });
+    }, [enLinea]);
 
     return (
         <Link

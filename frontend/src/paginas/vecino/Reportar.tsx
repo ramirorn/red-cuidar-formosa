@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router';
-import { Camera, Crosshair, LoaderCircle, MapPin, PackageOpen, Plus, Send, Sparkles, Trash2, TriangleAlert } from 'lucide-react';
+import { Camera, Crop, Crosshair, LoaderCircle, MapPin, PackageOpen, Plus, Send, ShieldCheck, Sparkles, Trash2, TriangleAlert } from 'lucide-react';
 import { MapaManzanas } from '@/componentes/mapa/MapaManzanas';
 import { Boton, BotonEnlace } from '@/componentes/ui/Boton';
 import { ChipEstado } from '@/componentes/ui/ChipEstado';
 import { Tarjeta } from '@/componentes/ui/Tarjeta';
+import { EditorRecorte } from '@/componentes/vecino/EditorRecorte';
 import { NOMBRES_CLASE } from '@/deteccion/clases';
 import { useMiManzana } from '@/hooks/useVecino';
 import { useColaReportes } from '@/hooks/useColaReportes';
 import { estaEnFormosa, obtenerUbicacion, type Ubicacion } from '@/lib/geo';
+import { deteccionesEnRecorte, recortarImagen } from '@/lib/recorte';
 import { cn } from '@/lib/utils';
 import { encolarReporte, pedirSincronizacionEnSegundoPlano } from '@/sinConexion/cola';
 import type { ClaseObjeto, Deteccion, TipoReporte } from '@/tipos';
@@ -22,20 +24,43 @@ const TIPOS: { tipo: TipoReporte; titulo: string; texto: string; Icono: typeof C
 
 const LARGO_DESCRIPCION = 500;
 
-const FotoConRecuadros = ({ foto, alQuitar }: { foto: FotoBorrador; alQuitar: () => void }) => (
-    <figure className="relative w-64 shrink-0 snap-start overflow-hidden rounded-2xl border border-gris-borde bg-tinta" style={{ aspectRatio: `${foto.ancho} / ${foto.alto}` }}>
-        <img src={foto.url} alt="Foto del reporte" className="absolute inset-0 size-full object-cover" />
-        <svg className="absolute inset-0 size-full" viewBox="0 0 1 1" preserveAspectRatio="none" aria-hidden>
-            {foto.detecciones.map((deteccion, indice) => (
-                <rect key={indice} x={deteccion.cajaDelimitadora.x} y={deteccion.cajaDelimitadora.y} width={deteccion.cajaDelimitadora.ancho} height={deteccion.cajaDelimitadora.alto}
-                    fill="none" stroke="#e11b22" strokeWidth={3} vectorEffect="non-scaling-stroke" rx={0.02} />
-            ))}
-        </svg>
-        <button type="button" onClick={alQuitar} aria-label="Quitar esta foto" className="absolute top-2 right-2 grid size-9 place-items-center rounded-full bg-white/90 text-rojo-600 shadow-suave">
-            <Trash2 className="size-4" aria-hidden />
-        </button>
-    </figure>
-);
+// Vista previa de lo que realmente se envía: solo el recorte. Si falta marcarlo, se pide.
+const FotoRecortada = ({ foto, alAjustar, alQuitar }: { foto: FotoBorrador; alAjustar: () => void; alQuitar: () => void }) => {
+    const recorte = foto.recorte;
+    return (
+        <figure className="flex w-44 shrink-0 snap-start flex-col overflow-hidden rounded-2xl border border-gris-borde bg-white">
+            <div className="relative grid h-40 place-items-center bg-tinta">
+                {recorte ? (
+                    <div
+                        role="img"
+                        aria-label="Parte de la foto que se envía"
+                        className="max-h-full max-w-full"
+                        style={{
+                            aspectRatio: `${foto.ancho * recorte.ancho} / ${foto.alto * recorte.alto}`,
+                            height: foto.ancho * recorte.ancho >= foto.alto * recorte.alto ? 'auto' : '100%',
+                            width: foto.ancho * recorte.ancho >= foto.alto * recorte.alto ? '100%' : 'auto',
+                            backgroundImage: `url(${foto.url})`,
+                            backgroundSize: `${100 / recorte.ancho}% ${100 / recorte.alto}%`,
+                            backgroundPosition: `${recorte.ancho < 1 ? (recorte.x / (1 - recorte.ancho)) * 100 : 0}% ${recorte.alto < 1 ? (recorte.y / (1 - recorte.alto)) * 100 : 0}%`,
+                        }}
+                    />
+                ) : (
+                    <>
+                        <img src={foto.url} alt="" className="absolute inset-0 size-full object-cover opacity-40" />
+                        <span className="relative px-3 text-center text-xs font-black text-white">Marcá dónde está el recipiente</span>
+                    </>
+                )}
+                <button type="button" onClick={alQuitar} aria-label="Quitar esta foto" className="absolute top-2 right-2 grid size-8 place-items-center rounded-full bg-white/90 text-rojo-600 shadow-suave">
+                    <Trash2 className="size-4" aria-hidden />
+                </button>
+            </div>
+            <button type="button" onClick={alAjustar}
+                className={cn('flex items-center justify-center gap-1.5 py-2.5 text-xs font-extrabold', recorte ? 'text-verde-700 hover:bg-bruma' : 'bg-rojo-50 text-rojo-700')}>
+                <Crop className="size-4" aria-hidden />{recorte ? 'Ajustar recorte' : 'Marcar recipiente'}
+            </button>
+        </figure>
+    );
+};
 
 // Resumen de lo que detectó la IA en todas las fotos: la mayor confianza por clase.
 const resumirDetecciones = (fotos: FotoBorrador[]) => {
@@ -57,11 +82,12 @@ export default function Reportar() {
     const [enviando, setEnviando] = useState(false);
     // Tras enviar, el borrador se vacía: no hay que redirigir al escáner en ese momento.
     const [enviado, setEnviado] = useState(false);
-    const { manzana, cercanas } = useMiManzana(ubicacion);
+    const [editando, setEditando] = useState<string | null>(null);
+    const { manzana, cercanas, fuera, isFetching: buscandoManzana, error: errorManzana } = useMiManzana(ubicacion);
 
     const detectadas = useMemo(() => resumirDetecciones(borrador.fotos), [borrador.fotos]);
     const tipo: TipoReporte | null = borrador.tipo ?? (detectadas.length > 0 ? 'CRIADERO' : null);
-    const esCierre = Boolean(borrador.reporteResueltoId);
+    const esCierre = Boolean(borrador.idClienteResuelto);
 
     const ubicar = async () => {
         setBuscandoUbicacion(true);
@@ -83,12 +109,19 @@ export default function Reportar() {
 
     if (borrador.fotos.length === 0 && !enviado) return <Navigate to="/app/escanear?nuevo=1" replace />;
 
-    const puedeEnviar = tipo !== null && ubicacion !== null && estaEnFormosa(ubicacion.latitud, ubicacion.longitud) && !enviando;
+    const faltaRecorte = borrador.fotos.some((foto) => foto.recorte === null);
+    const puedeEnviar = tipo !== null && manzana !== null && !faltaRecorte && !enviando;
+    const fotoEditada = borrador.fotos.find((foto) => foto.id === editando) ?? null;
 
     const enviar = async () => {
-        if (!puedeEnviar || !ubicacion || !tipo) return;
+        if (!puedeEnviar || !manzana || !tipo) return;
         setEnviando(true);
-        const todas: Deteccion[] = borrador.fotos.flatMap((foto) => foto.detecciones).slice(0, 50);
+        // Solo sale del celular el recorte de cada foto; las detecciones pasan a coordenadas del recorte.
+        const recortes = await Promise.all(borrador.fotos.map(async (foto) => ({
+            blob: await recortarImagen(foto.blob, foto.recorte!),
+            detecciones: deteccionesEnRecorte(foto.detecciones, foto.recorte!),
+        })));
+        const todas: Deteccion[] = recortes.flatMap((recorte) => recorte.detecciones).slice(0, 50);
         const mayor = Math.max(0, ...todas.map((deteccion) => deteccion.confianza));
         // La confianza solo ordena la revisión: en una limpieza, "sin recipientes" es lo esperable.
         const confianzaIa = tipo === 'LIMPIEZA' ? (todas.length === 0 ? 0.9 : Math.max(0, 1 - mayor)) : (todas.length > 0 ? mayor : undefined);
@@ -97,15 +130,14 @@ export default function Reportar() {
         await encolarReporte({
             idCliente,
             tipo,
-            latitud: ubicacion.latitud,
-            longitud: ubicacion.longitud,
-            precisionGpsM: ubicacion.precisionM,
+            manzanaId: manzana.id,
+            manzanaCodigo: manzana.properties.codigo,
             capturadoEn: borrador.fotos[0]?.capturadaEn ?? new Date().toISOString(),
             ...(confianzaIa !== undefined ? { confianzaIa } : {}),
             ...(descripcion.trim() ? { descripcion: descripcion.trim() } : {}),
-            ...(borrador.reporteResueltoId ? { reporteResueltoId: borrador.reporteResueltoId } : {}),
+            ...(borrador.idClienteResuelto ? { idClienteResuelto: borrador.idClienteResuelto } : {}),
             detecciones: todas,
-            fotos: borrador.fotos.map((foto) => foto.blob),
+            fotos: recortes.map((recorte) => recorte.blob),
         });
 
         await pedirSincronizacionEnSegundoPlano();
@@ -125,13 +157,19 @@ export default function Reportar() {
 
             <section aria-label="Fotos">
                 <div className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-2">
-                    {borrador.fotos.map((foto) => <FotoConRecuadros key={foto.id} foto={foto} alQuitar={() => borrador.quitarFoto(foto.id)} />)}
+                    {borrador.fotos.map((foto) => (
+                        <FotoRecortada key={foto.id} foto={foto} alAjustar={() => setEditando(foto.id)} alQuitar={() => borrador.quitarFoto(foto.id)} />
+                    ))}
                     {borrador.fotos.length < MAXIMO_FOTOS && (
-                        <BotonEnlace to="/app/escanear" state={{ volverAlReporte: true }} variante="contorno" className="h-auto w-32 shrink-0 flex-col rounded-2xl border-dashed py-6" icono={<Plus aria-hidden />}>
+                        <BotonEnlace to="/app/escanear" state={{ volverAlReporte: true }} variante="contorno" className="h-auto w-32 shrink-0 flex-col self-stretch rounded-2xl border-dashed py-6" icono={<Plus aria-hidden />}>
                             Agregar foto
                         </BotonEnlace>
                     )}
                 </div>
+                <p className="mt-1 flex items-start gap-2 text-xs text-gris-texto">
+                    <ShieldCheck className="mt-0.5 size-4 shrink-0 text-verde-600" aria-hidden />
+                    Solo se envía la parte marcada, sin datos ocultos de la foto. La ve una persona del equipo de salud y se borra después de revisarla.
+                </p>
             </section>
 
             <section aria-labelledby="titulo-tipo">
@@ -192,11 +230,17 @@ export default function Reportar() {
                 <div className="flex items-start justify-between gap-3 p-4">
                     <div className="text-sm">
                         <p className="flex items-center gap-2 font-extrabold"><MapPin className="size-4 text-rojo-500" aria-hidden />
-                            {buscandoUbicacion ? 'Buscando tu ubicación…' : manzana ? `Manzana ${manzana.properties.codigo}` : ubicacion ? 'Ubicación lista' : 'Sin ubicación'}
+                            {buscandoUbicacion || buscandoManzana ? 'Buscando tu manzana…' : manzana ? `Manzana ${manzana.properties.codigo}` : 'Sin manzana'}
                         </p>
-                        {ubicacion && <p className="mt-1 text-gris-texto">Precisión del GPS: ± {Math.round(ubicacion.precisionM)} m</p>}
+                        <p className="mt-1 text-gris-texto">Solo se envía el número de manzana: tu ubicación exacta no sale del celular.</p>
                         {manzana && <ChipEstado estado={manzana.properties.estado} tamano="chico" className="mt-2" />}
                         {errorUbicacion && <p role="alert" className="mt-2 font-bold text-rojo-600">{errorUbicacion}</p>}
+                        {fuera && !errorUbicacion && (
+                            <p role="alert" className="mt-2 font-bold text-rojo-600">Tu ubicación no está dentro de una manzana registrada. Por ahora no se pueden recibir reportes desde acá.</p>
+                        )}
+                        {errorManzana && !manzana && (
+                            <p role="alert" className="mt-2 font-bold text-rojo-600">No pudimos descargar el mapa de tu localidad. Conectate a internet una vez y tocá Actualizar.</p>
+                        )}
                     </div>
                     <Boton variante="contorno" tamano="chico" onClick={ubicar} disabled={buscandoUbicacion} icono={<Crosshair className="size-4" aria-hidden />}>
                         Actualizar
@@ -222,7 +266,21 @@ export default function Reportar() {
                 {enviando ? 'Enviando…' : 'Enviar reporte'}
             </Boton>
             {tipo === null && <p className="text-center text-sm font-bold text-rojo-600">Elegí qué encontraste para poder enviar.</p>}
+            {faltaRecorte && <p className="text-center text-sm font-bold text-rojo-600">Marcá el recipiente en cada foto para poder enviar.</p>}
             <Boton variante="fantasma" anchoCompleto onClick={() => { borrador.descartar(); navegar('/app'); }}>Descartar</Boton>
+
+            {fotoEditada && (
+                <EditorRecorte
+                    abierto
+                    alCerrar={() => setEditando(null)}
+                    alGuardar={(recorte) => { borrador.ajustarRecorte(fotoEditada.id, recorte); setEditando(null); }}
+                    url={fotoEditada.url}
+                    ancho={fotoEditada.ancho}
+                    alto={fotoEditada.alto}
+                    detecciones={fotoEditada.detecciones}
+                    recorte={fotoEditada.recorte}
+                />
+            )}
         </div>
     );
 }

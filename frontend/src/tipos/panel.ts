@@ -70,7 +70,6 @@ export interface ReporteDetalle {
     tipo: TipoReporte;
     origen: 'PWA' | 'CHAT';
     estado: EstadoReporte;
-    precisionGpsM: number | null;
     confianzaIa: number | null;
     descripcion: string | null;
     capturadoEn: string;
@@ -79,10 +78,12 @@ export interface ReporteDetalle {
     motivoRechazo: string | null;
     reporteResueltoId: string | null;
     validadoPor: PersonaBreve | null;
-    manzana: ManzanaBreve | null;
+    manzana: ManzanaBreve;
     detecciones: { clase: ClaseObjeto; confianza: number; cajaDelimitadora: CajaDelimitadora }[];
+    // Solo para Epidemiología y solo mientras el reporte está pendiente; para el resto llega vacío.
     evidencias: EvidenciaBreve[];
-    ubicacion: { latitud: number; longitud: number; exacta: boolean } | null;
+    // Cuándo se descarta un pendiente que nadie revisó (72 horas desde que llegó).
+    venceEn: string | null;
 }
 
 export interface FiltrosReportes {

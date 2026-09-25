@@ -1,5 +1,5 @@
 import { clientePublico, clienteVecino, datosDe } from './cliente';
-import type { ColeccionManzanas, Localidad, Pagina, ReporteResumen, RespuestaApi, RespuestaChat } from '@/tipos';
+import type { ColeccionManzanas, Localidad, ReporteResumen, RespuestaChat } from '@/tipos';
 
 export interface Recuadro {
     longitudMinima: number;
@@ -19,10 +19,13 @@ export const vecinoApi = {
 
     manzanas: async (recuadro: Recuadro) => datosDe<ColeccionManzanas>(await clientePublico.get('/manzanas', { params: recuadro })),
 
-    misReportes: async (cursor?: string): Promise<Pagina<ReporteResumen>> => {
-        const { data } = await clienteVecino.get<RespuestaApi<ReporteResumen[]>>('/reportes/mios', { params: { limite: 20, cursor } });
-        return { datos: data.data, paginacion: data.pagination ?? { limite: 20, siguienteCursor: null } };
-    },
+    // Todas las manzanas de la localidad: el celular calcula en cuál está sin enviar su ubicación.
+    manzanasDeLocalidad: async (localidadId: number) =>
+        datosDe<ColeccionManzanas>(await clientePublico.get(`/localidades/${localidadId}/manzanas`, { timeout: 60_000 })),
+
+    // Estado de los reportes propios, por los idCliente que guarda el celular (el servidor no sabe cuáles son).
+    consultarPropios: async (idsCliente: string[]) =>
+        datosDe<ReporteResumen[]>(await clienteVecino.post('/reportes/consulta', { idsCliente })),
 
     enviarMensaje: async (mensaje: string, historial: MensajeHistorialApi[]) =>
         datosDe<RespuestaChat>(await clienteVecino.post('/chat/mensajes', { mensaje, historial }, { timeout: 100_000 })),

@@ -33,13 +33,31 @@ export const listarCola = async (): Promise<ReporteEnCola[]> =>
 
 export const encolarReporte = async ({ fotos, ...reporte }: NuevoReporte) => {
     const guardadas = await Promise.all(fotos.map(async (foto) => ({ datos: await foto.arrayBuffer(), tipo: foto.type || 'image/jpeg' })));
-    await (await abrirBase()).put('cola', { ...reporte, fotos: guardadas, estado: 'pendiente', intentos: 0, creadoEn: new Date().toISOString() });
+    const creadoEn = new Date().toISOString();
+    const bd = await abrirBase();
+    await bd.put('cola', { ...reporte, fotos: guardadas, estado: 'pendiente', intentos: 0, creadoEn });
+    // El celular recuerda sus propios reportes: el servidor no guarda de quién es cada uno.
+    await bd.put('propios', { idCliente: reporte.idCliente, tipo: reporte.tipo, manzanaCodigo: reporte.manzanaCodigo, creadoEn });
     avisarCambio();
 };
 
 export const descartarDeCola = async (idCliente: string) => {
-    await (await abrirBase()).delete('cola', idCliente);
+    const bd = await abrirBase();
+    await bd.delete('cola', idCliente);
+    await bd.delete('propios', idCliente);
     avisarCambio();
+};
+
+// Pasados 30 días se olvidan (en el servidor ya se decidieron o se descartaron).
+const RECORDAR_PROPIOS_MS = 30 * 24 * 60 * 60 * 1000;
+
+export const listarPropios = async () => {
+    const bd = await abrirBase();
+    const todos = await bd.getAllFromIndex('propios', 'porCreacion');
+    const limite = Date.now() - RECORDAR_PROPIOS_MS;
+    const viejos = todos.filter((propio) => new Date(propio.creadoEn).getTime() < limite);
+    await Promise.all(viejos.map((propio) => bd.delete('propios', propio.idCliente)));
+    return todos.filter((propio) => !viejos.includes(propio)).reverse();
 };
 
 export const reintentarReporte = async (idCliente: string) => {
@@ -53,13 +71,12 @@ const armarFormulario = (reporte: ReporteEnCola) => {
     const formulario = new FormData();
     formulario.set('idCliente', reporte.idCliente);
     formulario.set('tipo', reporte.tipo);
-    formulario.set('latitud', String(reporte.latitud));
-    formulario.set('longitud', String(reporte.longitud));
+    // Solo la manzana: la ubicación exacta nunca sale del celular.
+    formulario.set('manzanaId', String(reporte.manzanaId));
     formulario.set('capturadoEn', reporte.capturadoEn);
-    if (reporte.precisionGpsM !== undefined) formulario.set('precisionGpsM', String(Math.round(reporte.precisionGpsM)));
     if (reporte.confianzaIa !== undefined) formulario.set('confianzaIa', reporte.confianzaIa.toFixed(3));
     if (reporte.descripcion) formulario.set('descripcion', reporte.descripcion);
-    if (reporte.reporteResueltoId) formulario.set('reporteResueltoId', reporte.reporteResueltoId);
+    if (reporte.idClienteResuelto) formulario.set('idClienteResuelto', reporte.idClienteResuelto);
     if (reporte.detecciones.length > 0) formulario.set('detecciones', JSON.stringify(reporte.detecciones));
     reporte.fotos.forEach((foto, indice) => formulario.append('imagenes', fotoComoBlob(foto), `foto-${indice + 1}.jpg`));
     return formulario;

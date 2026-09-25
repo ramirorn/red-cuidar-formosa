@@ -15,7 +15,7 @@ const PASOS = [
 
 export default function Limpieza() {
     const { data, isLoading } = useMisReportes();
-    const abiertos = (data?.pages.flatMap((pagina) => pagina.datos) ?? [])
+    const abiertos = (data ?? [])
         .filter((reporte) => reporte.tipo !== 'LIMPIEZA' && (reporte.estado === 'PENDIENTE' || reporte.estado === 'VALIDADO'));
 
     return (
@@ -43,9 +43,9 @@ export default function Limpieza() {
                 {isLoading && <p className="mt-3 text-sm text-gris-texto">Cargando tus reportes…</p>}
                 <ul className="mt-3 space-y-2">
                     {abiertos.map((reporte) => (
-                        <li key={reporte.id}>
+                        <li key={reporte.idCliente}>
                             <BotonEnlace
-                                to={`/app/escanear?tipo=LIMPIEZA&resuelve=${reporte.id}`}
+                                to={`/app/escanear?tipo=LIMPIEZA&resuelve=${reporte.idCliente}`}
                                 variante="blanco"
                                 className="h-auto w-full justify-between rounded-2xl border border-gris-borde px-4 py-3 text-tinta"
                                 iconoFinal={<ArrowRight className="size-4 text-verde-600" aria-hidden />}
@@ -53,8 +53,8 @@ export default function Limpieza() {
                                 <span className="flex items-center gap-3 text-left">
                                     {reporte.tipo === 'CRIADERO' ? <TriangleAlert className="size-6 text-rojo-500" aria-hidden /> : <PackageOpen className="size-6 text-rojo-500" aria-hidden />}
                                     <span>
-                                        <span className="block font-black">{reporte.tipo === 'CRIADERO' ? 'Criadero' : 'Microbasural'}{reporte.manzana ? ` · ${reporte.manzana.codigo}` : ''}</span>
-                                        <span className="block text-xs font-semibold text-gris-texto">{formatearFecha(reporte.capturadoEn)}</span>
+                                        <span className="block font-black">{reporte.tipo === 'CRIADERO' ? 'Criadero' : 'Microbasural'} · {reporte.manzanaCodigo}</span>
+                                        <span className="block text-xs font-semibold text-gris-texto">{formatearFecha(reporte.creadoEn)}</span>
                                     </span>
                                 </span>
                                 <ChipEstadoReporte estado={reporte.estado} />

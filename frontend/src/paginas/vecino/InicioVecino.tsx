@@ -90,7 +90,7 @@ const TuManzana = () => {
     const [ubicacion, setUbicacion] = useState<Ubicacion | null>(null);
     const [buscando, setBuscando] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const { manzana, cercanas, isFetching } = useMiManzana(ubicacion);
+    const { manzana, cercanas, isFetching, fuera } = useMiManzana(ubicacion);
 
     useEffect(() => {
         void leerAjuste<Ubicacion>('ultimaUbicacion').then((guardada) => guardada && setUbicacion(guardada));
@@ -139,7 +139,9 @@ const TuManzana = () => {
                             </>
                         ) : (
                             <p className="text-sm leading-relaxed text-tinta-suave">
-                                {isFetching ? 'Buscando tu manzana…' : 'Tu ubicación todavía no tiene manzanas cargadas en el mapa. Igual podés reportar.'}
+                                {isFetching ? 'Buscando tu manzana…' : fuera
+                                    ? 'Tu ubicación no está dentro de una manzana registrada: por ahora no se pueden recibir reportes desde acá.'
+                                    : 'No pudimos cargar el mapa de tu localidad. Conectate a internet y tocá Actualizar ubicación.'}
                             </p>
                         )}
                         <button type="button" onClick={ubicar} className="mt-3 flex items-center gap-2 text-sm font-extrabold text-verde-700">
@@ -150,7 +152,7 @@ const TuManzana = () => {
                 </>
             ) : (
                 <div className="p-5">
-                    <p className="text-sm leading-relaxed text-tinta-suave">Mirá de qué color está tu cuadra. Usamos tu ubicación solo para mostrarte el mapa.</p>
+                    <p className="text-sm leading-relaxed text-tinta-suave">Mirá de qué color está tu cuadra. Tu ubicación se usa solo en tu celular: nunca se envía.</p>
                     {error && <p role="alert" className="mt-2 text-sm font-bold text-rojo-600">{error}</p>}
                     <Boton variante="contorno" className="mt-4" onClick={ubicar} disabled={buscando}
                         icono={buscando ? <LoaderCircle className="size-4 animate-spin" aria-hidden /> : <Crosshair className="size-4" aria-hidden />}>

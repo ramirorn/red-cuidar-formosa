@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CircleAlert, CloudUpload, LoaderCircle, PackageOpen, RefreshCw, Sparkles, Trash2, TriangleAlert } from 'lucide-react';
+import { CircleAlert, CloudUpload, LoaderCircle, PackageOpen, RefreshCw, ShieldCheck, Sparkles, Trash2, TriangleAlert } from 'lucide-react';
 import { Boton, BotonEnlace } from '@/componentes/ui/Boton';
 import { ChipEstadoReporte } from '@/componentes/ui/ChipEstadoReporte';
 import { Tarjeta } from '@/componentes/ui/Tarjeta';
@@ -11,12 +11,13 @@ import { useMisReportes } from '@/hooks/useVecino';
 import { errorAmigable } from '@/lib/errores';
 import { formatearFecha } from '@/lib/formato';
 import { cn } from '@/lib/utils';
-import type { EstadoReporte, TipoReporte } from '@/tipos';
+import type { TipoReporte } from '@/tipos';
+import type { EstadoPropio } from '@/hooks/useVecino';
 
 const ICONOS: Record<TipoReporte, typeof TriangleAlert> = { CRIADERO: TriangleAlert, MICROBASURAL: PackageOpen, LIMPIEZA: Sparkles };
 const NOMBRES: Record<TipoReporte, string> = { CRIADERO: 'Criadero', MICROBASURAL: 'Microbasural', LIMPIEZA: 'Limpieza' };
 
-const FILTROS: { valor: EstadoReporte | 'TODOS'; texto: string }[] = [
+const FILTROS: { valor: EstadoPropio | 'TODOS'; texto: string }[] = [
     { valor: 'TODOS', texto: 'Todos' },
     { valor: 'PENDIENTE', texto: 'En revisión' },
     { valor: 'VALIDADO', texto: 'Confirmados' },
@@ -50,7 +51,7 @@ const EnEspera = () => {
                                 <img src={reporte.fotos[0] ? URL.createObjectURL(fotoComoBlob(reporte.fotos[0])) : ''} alt="" className="size-14 rounded-xl object-cover" onLoad={(evento) => URL.revokeObjectURL(evento.currentTarget.src)} />
                                 <div className="min-w-0 flex-1">
                                     <p className="flex items-center gap-1.5 font-black"><Icono className="size-4" aria-hidden />{NOMBRES[reporte.tipo]}</p>
-                                    <p className="text-xs text-gris-texto">{formatearFecha(reporte.capturadoEn)}</p>
+                                    <p className="text-xs text-gris-texto">Manzana {reporte.manzanaCodigo} · {formatearFecha(reporte.capturadoEn)}</p>
                                     {reporte.estado === 'error' && <p className="mt-1 flex items-center gap-1 text-xs font-bold text-rojo-700"><CircleAlert className="size-3.5" aria-hidden />{reporte.ultimoError}</p>}
                                 </div>
                                 {reporte.estado === 'error' ? (
@@ -71,11 +72,11 @@ const EnEspera = () => {
 };
 
 export default function MisReportes() {
-    const [filtro, setFiltro] = useState<EstadoReporte | 'TODOS'>('TODOS');
-    const { data, isLoading, fetchStatus, error, hasNextPage, fetchNextPage, isFetchingNextPage } = useMisReportes();
+    const [filtro, setFiltro] = useState<EstadoPropio | 'TODOS'>('TODOS');
+    const { data, isLoading, fetchStatus, error } = useMisReportes();
     // Sin señal, React Query pausa la consulta: se avisa en lugar de mostrar "cargando" para siempre.
     const enPausa = isLoading && fetchStatus === 'paused';
-    const todos = data?.pages.flatMap((pagina) => pagina.datos) ?? [];
+    const todos = data ?? [];
     const visibles = filtro === 'TODOS' ? todos : todos.filter((reporte) => reporte.estado === filtro);
 
     return (
@@ -110,14 +111,14 @@ export default function MisReportes() {
                     {visibles.map((reporte) => {
                         const Icono = ICONOS[reporte.tipo];
                         return (
-                            <li key={reporte.id}>
+                            <li key={reporte.idCliente}>
                                 <Tarjeta className="flex items-center gap-3 p-4">
                                     <span className={cn('grid size-11 shrink-0 place-items-center rounded-xl', reporte.tipo === 'LIMPIEZA' ? 'bg-verde-50 text-verde-700' : 'bg-rojo-50 text-rojo-600')}>
                                         <Icono className="size-5" aria-hidden />
                                     </span>
                                     <div className="min-w-0 flex-1">
-                                        <p className="font-black">{NOMBRES[reporte.tipo]}{reporte.manzana ? <span className="font-semibold text-gris-texto"> · {reporte.manzana.codigo}</span> : null}</p>
-                                        <p className="text-xs text-gris-texto">{formatearFecha(reporte.capturadoEn)}</p>
+                                        <p className="font-black">{NOMBRES[reporte.tipo]}<span className="font-semibold text-gris-texto"> · Manzana {reporte.manzanaCodigo}</span></p>
+                                        <p className="text-xs text-gris-texto">{formatearFecha(reporte.creadoEn)}</p>
                                     </div>
                                     <ChipEstadoReporte estado={reporte.estado} />
                                 </Tarjeta>
@@ -126,11 +127,11 @@ export default function MisReportes() {
                     })}
                 </ul>
 
-                {hasNextPage && (
-                    <Boton variante="contorno" anchoCompleto onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
-                        {isFetchingNextPage ? 'Cargando…' : 'Ver más'}
-                    </Boton>
-                )}
+                <p className="flex items-start gap-2 pt-2 text-xs leading-relaxed text-gris-texto">
+                    <ShieldCheck className="mt-0.5 size-4 shrink-0 text-verde-600" aria-hidden />
+                    Esta lista está guardada solo en tu celular. El servidor no sabe qué reportes son tuyos,
+                    solo guarda la manzana, y las fotos se borran después de revisarlas.
+                </p>
             </section>
         </div>
     );

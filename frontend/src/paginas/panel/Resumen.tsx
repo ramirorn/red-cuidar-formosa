@@ -3,6 +3,7 @@ import { Link } from 'react-router';
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { ArrowRight, CircleAlert, CircleCheck, Clock, Grid3x3, Syringe } from 'lucide-react';
 import { useUsuarioPanel } from '@/autenticacion/SesionPanel';
+import { AvisoPorVencer } from '@/componentes/panel/AvisoPorVencer';
 import { EncabezadoPagina } from '@/componentes/panel/Encabezado';
 import { ConfianzaIa } from '@/componentes/panel/Chips';
 import { ErrorCarga } from '@/componentes/panel/Estados';
@@ -151,6 +152,7 @@ export default function Resumen() {
                 )}
             />
 
+            <AvisoPorVencer />
             {error && <ErrorCarga error={error} alReintentar={() => void refetch()} />}
 
             <div className={cn('grid grid-cols-2 gap-3 transition-opacity sm:gap-4 xl:grid-cols-5 [&>*:last-child]:col-span-2 xl:[&>*:last-child]:col-span-1', isFetching && 'opacity-70')}>

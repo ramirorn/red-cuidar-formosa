@@ -1,13 +1,14 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Camera, ChevronDown, Crosshair, Info, LoaderCircle, X, ZoomIn } from 'lucide-react';
 import { MapaManzanas } from '@/componentes/mapa/MapaManzanas';
 import { BotonEnlace } from '@/componentes/ui/Boton';
 import { ChipEstado, ESTADOS_MANZANA } from '@/componentes/ui/ChipEstado';
-import { useManzanas } from '@/hooks/useVecino';
+import { useLocalidades, useManzanasDeLocalidad } from '@/hooks/useVecino';
 import type { Recuadro } from '@/api/vecino.api';
 import { CENTRO_FORMOSA_CAPITAL, obtenerUbicacion } from '@/lib/geo';
 import { cn } from '@/lib/utils';
 import { leerAjuste } from '@/sinConexion/bd';
+import { manzanasEnArea, ubicarEnManzana } from '@/sinConexion/manzanasLocales';
 import type { EstadoManzana, FeatureManzana } from '@/tipos';
 
 const ORDEN: EstadoManzana[] = ['VERDE', 'AMARILLO', 'ROJO', 'SIN_DATOS'];
@@ -20,7 +21,11 @@ export default function MapaBarrio() {
     const [seleccionada, setSeleccionada] = useState<FeatureManzana | null>(null);
     const [leyendaAbierta, setLeyendaAbierta] = useState(true);
     const [buscando, setBuscando] = useState(false);
-    const { data, isFetching } = useManzanas(recuadro);
+    // Se descargan todas las manzanas de la localidad y se dibujan solo las visibles:
+    // mover el mapa no le dice al servidor qué zona está mirando el vecino.
+    const [localidadId, setLocalidadId] = useState<number | null>(null);
+    const { data: localidades = [] } = useLocalidades();
+    const { data: coleccion, isFetching } = useManzanasDeLocalidad(localidadId);
 
     useEffect(() => {
         void leerAjuste<{ latitud: number; longitud: number }>('ultimaUbicacion').then((guardada) => {
@@ -29,7 +34,16 @@ export default function MapaBarrio() {
                 setUbicacion([guardada.latitud, guardada.longitud]);
             }
         });
+        void leerAjuste<number>('ultimaLocalidad').then((guardada) => { if (guardada) setLocalidadId((actual) => actual ?? guardada); });
     }, []);
+
+    // Sin localidad guardada, la de Formosa Capital (o la primera del catálogo).
+    useEffect(() => {
+        if (localidadId !== null || localidades.length === 0) return;
+        void leerAjuste<number>('ultimaLocalidad').then((guardada) => {
+            if (!guardada) setLocalidadId(localidades.find((localidad) => localidad.nombre === 'Formosa Capital')?.id ?? localidades[0]!.id);
+        });
+    }, [localidadId, localidades]);
 
     const alMover = useCallback((nuevo: Recuadro | null) => {
         setRecuadro(nuevo);
@@ -42,12 +56,15 @@ export default function MapaBarrio() {
             const { latitud, longitud } = await obtenerUbicacion();
             setUbicacion([latitud, longitud]);
             setCentro([latitud, longitud]);
+            const resultado = await ubicarEnManzana(latitud, longitud).catch(() => null);
+            if (resultado?.localidadId) setLocalidadId(resultado.localidadId);
+            if (resultado?.tipo === 'encontrada') setSeleccionada(resultado.manzana);
         } finally {
             setBuscando(false);
         }
     };
 
-    const manzanas = data?.features ?? [];
+    const manzanas = useMemo(() => (coleccion && recuadro ? manzanasEnArea(coleccion, recuadro) : []), [coleccion, recuadro]);
     const verdes = manzanas.filter((manzana) => manzana.properties.estado === 'VERDE').length;
     const conDatos = manzanas.filter((manzana) => manzana.properties.estado !== 'SIN_DATOS').length;
 
@@ -62,6 +79,7 @@ export default function MapaBarrio() {
                 ubicacion={ubicacion}
                 alMover={alMover}
                 alElegir={setSeleccionada}
+                enLienzo
                 className="size-full"
             />
 

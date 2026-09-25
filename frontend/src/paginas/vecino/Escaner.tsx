@@ -58,7 +58,7 @@ export default function Escaner() {
     useEffect(() => {
         const tipo = parametros.get('tipo') as TipoReporte | null;
         const resuelve = parametros.get('resuelve');
-        if (parametros.get('nuevo') || tipo || resuelve) iniciar({ ...(tipo ? { tipo } : {}), ...(resuelve ? { reporteResueltoId: resuelve } : {}) });
+        if (parametros.get('nuevo') || tipo || resuelve) iniciar({ ...(tipo ? { tipo } : {}), ...(resuelve ? { idClienteResuelto: resuelve } : {}) });
     }, [parametros, iniciar]);
 
     useEffect(() => {

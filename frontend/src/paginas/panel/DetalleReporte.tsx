@@ -1,11 +1,9 @@
 import { useState, type ReactNode } from 'react';
 import { Link, useLocation, useParams } from 'react-router';
-import { CircleMarker } from 'react-leaflet';
 import { toast } from 'sonner';
-import { Bot, CircleCheck, CircleX, LoaderCircle, MapPin, ShieldCheck, Syringe } from 'lucide-react';
+import { Bot, CircleCheck, CircleX, LoaderCircle, Hourglass, ShieldCheck, Syringe } from 'lucide-react';
 import { isAxiosError } from 'axios';
 import { useUsuarioPanel } from '@/autenticacion/SesionPanel';
-import { MapaManzanas } from '@/componentes/mapa/MapaManzanas';
 import { AreaTexto, Campo } from '@/componentes/panel/Campos';
 import { ChipReporte, ConfianzaIa } from '@/componentes/panel/Chips';
 import { Dialogo } from '@/componentes/panel/Dialogo';
@@ -18,11 +16,10 @@ import { ChipEstado } from '@/componentes/ui/ChipEstado';
 import { Tarjeta } from '@/componentes/ui/Tarjeta';
 import { NOMBRES_CLASE } from '@/deteccion/clases';
 import { useCambiarEstadoReporte, useReporte } from '@/hooks/usePanel';
-import { useManzanas } from '@/hooks/useVecino';
 import { errorAmigable } from '@/lib/errores';
 import { accionesReporte, nombreCompleto, TIPOS_REPORTE } from '@/lib/etiquetasPanel';
 import { formatearFecha } from '@/lib/formato';
-import { recuadroAlrededor } from '@/lib/geo';
+import { cn } from '@/lib/utils';
 import type { EstadoReporte } from '@/tipos';
 import type { ReporteDetalle } from '@/tipos/panel';
 
@@ -47,28 +44,34 @@ const Dato = ({ etiqueta, children }: { etiqueta: string; children: ReactNode })
     </div>
 );
 
-const MapaUbicacion = ({ reporte }: { reporte: ReporteDetalle }) => {
-    const ubicacion = reporte.ubicacion;
-    const { data } = useManzanas(ubicacion ? recuadroAlrededor(ubicacion.latitud, ubicacion.longitud) : null);
-    if (!ubicacion) return null;
-    const centro: [number, number] = [ubicacion.latitud, ubicacion.longitud];
+// Tiempo que le queda a un reporte pendiente antes de descartarse (con su foto).
+const Vencimiento = ({ venceEn }: { venceEn: string }) => {
+    const horas = Math.max(0, Math.floor((new Date(venceEn).getTime() - Date.now()) / 3_600_000));
+    const urgente = horas < 24;
     return (
-        <Tarjeta className="overflow-hidden">
-            <MapaManzanas centro={centro} zoom={17} manzanas={data?.features ?? []} seleccionadaId={reporte.manzana?.id ?? null} className="h-60 w-full">
-                <CircleMarker center={centro} radius={ubicacion.exacta ? 9 : 22}
-                    pathOptions={ubicacion.exacta
-                        ? { color: '#fff', weight: 3, fillColor: '#e11b22', fillOpacity: 1 }
-                        : { color: '#e11b22', weight: 2, dashArray: '4 4', fillColor: '#e11b22', fillOpacity: 0.15 }} />
-            </MapaManzanas>
-            <p className="flex items-center gap-2 px-4 py-3 text-xs text-tinta-suave">
-                <MapPin className="size-4 shrink-0" aria-hidden />
-                {ubicacion.exacta
-                    ? `Ubicación exacta${reporte.precisionGpsM ? ` (±${reporte.precisionGpsM} m)` : ''}. Es la casa de un vecino: no la compartas.`
-                    : 'Ubicación aproximada (≈ 110 m) por privacidad del vecino.'}
-            </p>
-        </Tarjeta>
+        <p className={cn('flex items-center gap-2 rounded-2xl p-3 text-sm font-bold', urgente ? 'bg-rojo-50 text-rojo-700' : 'bg-amber-50 text-amber-800')}>
+            <Hourglass className="size-4 shrink-0" aria-hidden />
+            {horas === 0 ? 'Vence en menos de una hora' : `Vence en ${horas} ${horas === 1 ? 'hora' : 'horas'}`}: si nadie lo revisa, se descarta con su foto.
+        </p>
     );
 };
+
+// Explica por qué no hay foto: privacidad del vecino.
+const SinFoto = ({ reporte, puedeVerFotos }: { reporte: ReporteDetalle; puedeVerFotos: boolean }) => (
+    <Tarjeta className="flex items-start gap-3 p-5">
+        <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-bruma text-verde-700"><ShieldCheck className="size-5" aria-hidden /></span>
+        <div className="text-sm">
+            <p className="font-black">{reporte.estado !== 'PENDIENTE' ? 'La foto ya se borró' : 'Las fotos solo las ve Epidemiología'}</p>
+            <p className="mt-1 leading-relaxed text-tinta-suave">
+                {reporte.estado !== 'PENDIENTE'
+                    ? 'Para proteger la privacidad del vecino, la foto se borra en cuanto el reporte se valida o se rechaza.'
+                    : puedeVerFotos
+                        ? 'Este reporte no tiene fotos disponibles.'
+                        : 'Para proteger la privacidad del vecino, solo Epidemiología revisa las fotos y decide si el reporte es válido.'}
+            </p>
+        </div>
+    </Tarjeta>
+);
 
 export default function DetalleReporte() {
     const { id = '' } = useParams();
@@ -120,11 +123,20 @@ export default function DetalleReporte() {
 
             <div className="grid gap-6 xl:grid-cols-[1.6fr_1fr]">
                 <div className="space-y-6">
-                    <div className={unaSolaFoto ? '' : 'grid gap-4 sm:grid-cols-2'}>
-                        {reporte.evidencias.map((evidencia) => (
-                            <ImagenEvidencia key={evidencia.id} evidencia={evidencia} detecciones={unaSolaFoto ? reporte.detecciones : []} />
-                        ))}
-                    </div>
+                    {reporte.venceEn && <Vencimiento venceEn={reporte.venceEn} />}
+                    {reporte.evidencias.length > 0 ? (
+                        <>
+                            <div className={unaSolaFoto ? 'mx-auto max-w-xl' : 'grid gap-4 sm:grid-cols-2'}>
+                                {reporte.evidencias.map((evidencia) => (
+                                    <ImagenEvidencia key={evidencia.id} evidencia={evidencia} detecciones={unaSolaFoto ? reporte.detecciones : []} />
+                                ))}
+                            </div>
+                            <p className="flex items-center gap-2 text-xs text-gris-texto">
+                                <ShieldCheck className="size-4 text-verde-600" aria-hidden />
+                                Es solo el recorte que marcó el vecino. Se borra cuando decidas; cada vista queda en la auditoría.
+                            </p>
+                        </>
+                    ) : <SinFoto reporte={reporte} puedeVerFotos={puede('evidencias:ver')} />}
 
                     {reporte.detecciones.length > 0 && (
                         <Tarjeta className="p-5">
@@ -178,7 +190,7 @@ export default function DetalleReporte() {
                     <Tarjeta className="px-5 py-3">
                         <dl className="divide-y divide-gris-borde">
                             <Dato etiqueta="Manzana">
-                                {reporte.manzana ? <span className="flex flex-col items-end gap-1">{reporte.manzana.codigo}<ChipEstado estado={reporte.manzana.estado} tamano="chico" /></span> : 'Sin manzana'}
+                                <span className="flex flex-col items-end gap-1">{reporte.manzana.codigo}<ChipEstado estado={reporte.manzana.estado} tamano="chico" /></span>
                             </Dato>
                             <Dato etiqueta="Foto tomada">{formatearFecha(reporte.capturadoEn)}</Dato>
                             <Dato etiqueta="Confianza de la IA"><ConfianzaIa valor={reporte.confianzaIa} /></Dato>
@@ -192,7 +204,6 @@ export default function DetalleReporte() {
                         </dl>
                     </Tarjeta>
 
-                    <MapaUbicacion reporte={reporte} />
                 </div>
             </div>
 
@@ -212,7 +223,7 @@ export default function DetalleReporte() {
 
             {reporte.manzana && (
                 <Dialogo abierto={intervencion} alCambiar={setIntervencion} titulo="Registrar intervención">
-                    <FormularioIntervencion manzana={reporte.manzana} reporteId={reporte.id} ubicacion={reporte.ubicacion?.exacta ? reporte.ubicacion : null}
+                    <FormularioIntervencion manzana={reporte.manzana} reporteId={reporte.id}
                         tipoInicial={reporte.tipo === 'MICROBASURAL' ? 'DESCACHARRADO' : undefined} alTerminar={() => setIntervencion(false)} />
                 </Dialogo>
             )}

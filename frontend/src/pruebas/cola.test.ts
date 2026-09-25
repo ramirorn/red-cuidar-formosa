@@ -1,13 +1,13 @@
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { abrirBase, guardarAjuste } from '@/sinConexion/bd';
-import { encolarReporte, listarCola, sincronizarCola, type NuevoReporte } from '@/sinConexion/cola';
+import { encolarReporte, listarCola, listarPropios, sincronizarCola, type NuevoReporte } from '@/sinConexion/cola';
 
 const reporte = (idCliente: string): NuevoReporte => ({
     idCliente,
     tipo: 'CRIADERO',
-    latitud: -26.18,
-    longitud: -58.17,
+    manzanaId: 12,
+    manzanaCodigo: 'EJ-0101',
     capturadoEn: new Date().toISOString(),
     detecciones: [],
     fotos: [new Blob(['foto'], { type: 'image/jpeg' })],
@@ -17,6 +17,7 @@ const respuesta = (estado: number, cuerpo: unknown = {}) => new Response(JSON.st
 
 beforeEach(async () => {
     await (await abrirBase()).clear('cola');
+    await (await abrirBase()).clear('propios');
     await guardarAjuste('sesion', { sesionId: 'sesion-1', token: 'token-1' });
     vi.restoreAllMocks();
 });
@@ -79,5 +80,18 @@ describe('cola de reportes sin conexión', () => {
 
         expect(resultado.pendientes).toBe(1);
         expect((await listarCola())[0]).toMatchObject({ estado: 'pendiente', intentos: 1 });
+    });
+
+    it('envía solo la manzana, nunca coordenadas, y recuerda el reporte en el celular', async () => {
+        const enviar = vi.spyOn(globalThis, 'fetch').mockResolvedValue(respuesta(201));
+        await encolarReporte(reporte('privado'));
+
+        await sincronizarCola();
+
+        const formulario = enviar.mock.calls[0]![1]!.body as FormData;
+        expect(formulario.get('manzanaId')).toBe('12');
+        expect(formulario.has('latitud')).toBe(false);
+        expect(formulario.has('longitud')).toBe(false);
+        expect((await listarPropios()).map((propio) => propio.idCliente)).toEqual(['privado']);
     });
 });

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
-import { Bot, ChevronRight, Image, MessageCircle, Smartphone } from 'lucide-react';
+import { Bot, ChevronRight, Hourglass, Image, MessageCircle, Smartphone } from 'lucide-react';
+import { AvisoPorVencer } from '@/componentes/panel/AvisoPorVencer';
 import { EncabezadoPagina } from '@/componentes/panel/Encabezado';
 import { Filtro } from '@/componentes/panel/Campos';
 import { Desplegable } from '@/componentes/ui/Desplegable';
@@ -12,6 +13,7 @@ import { Tarjeta } from '@/componentes/ui/Tarjeta';
 import { useReportes } from '@/hooks/usePanel';
 import { ESTADOS_REPORTE_PANEL, TIPOS_REPORTE } from '@/lib/etiquetasPanel';
 import { formatearFecha, hace } from '@/lib/formato';
+import { cn } from '@/lib/utils';
 import type { EstadoReporte, TipoReporte } from '@/tipos';
 import type { FiltrosReportes, ReporteListado } from '@/tipos/panel';
 
@@ -38,6 +40,16 @@ const aParametros = (filtros: FiltrosReportes) => {
     if (filtros.localidadId) parametros.set('localidadId', String(filtros.localidadId));
     if (filtros.orden === 'prioridad') parametros.set('orden', 'prioridad');
     return parametros;
+};
+
+// Horas que le quedan a un pendiente antes de descartarse (72 h desde que llegó).
+const HorasRestantes = ({ creadoEn }: { creadoEn: string }) => {
+    const horas = Math.max(0, Math.floor((new Date(creadoEn).getTime() + 72 * 3_600_000 - Date.now()) / 3_600_000));
+    return (
+        <span className={cn('mt-1 flex items-center gap-1 text-xs font-bold', horas < 24 ? 'text-rojo-600' : 'text-gris-texto')}>
+            <Hourglass className="size-3" aria-hidden />Vence en {horas} h
+        </span>
+    );
 };
 
 const Origen = ({ origen }: { origen: ReporteListado['origen'] }) => (
@@ -71,8 +83,10 @@ export default function BandejaReportes() {
             <EncabezadoPagina
                 rotulo="Validación"
                 titulo="Reportes de vecinos"
-                descripcion="Todo reporte lo valida una persona. La confianza de la IA solo sirve para decidir qué mirar primero."
+                descripcion="Todo reporte lo valida Epidemiología. La IA solo ayuda a decidir qué mirar primero. Un pendiente sin revisar se descarta a las 72 horas."
             />
+
+            <AvisoPorVencer />
 
             <BarraFiltros>
                 <Filtro etiqueta="Estado">
@@ -144,7 +158,10 @@ export default function BandejaReportes() {
                                             <p className="text-xs text-gris-texto">{formatearFecha(reporte.createdAt)}</p>
                                         </td>
                                         <td className="px-3 py-3.5"><ConfianzaIa valor={reporte.confianzaIa} /></td>
-                                        <td className="px-3 py-3.5"><ChipReporte estado={reporte.estado} /></td>
+                                        <td className="px-3 py-3.5">
+                                            <ChipReporte estado={reporte.estado} />
+                                            {reporte.estado === 'PENDIENTE' && <HorasRestantes creadoEn={reporte.createdAt} />}
+                                        </td>
                                         <td className="px-3 py-3.5 text-right">
                                             <Link to={`/panel/reportes/${reporte.id}`} state={volver} aria-label={`Abrir reporte de ${TIPOS_REPORTE[reporte.tipo].toLowerCase()} en ${reporte.manzana?.codigo ?? 'sin manzana'}`}
                                                 onClick={(evento) => evento.stopPropagation()} className="inline-grid size-9 place-items-center rounded-full hover:bg-white">

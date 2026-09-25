@@ -4,9 +4,9 @@ import type { EstadoRuta, Rol, TipoIntervencion, UnidadProducto } from '@/tipos/
 // Textos del panel para los valores del backend (un solo lugar, así la interfaz es consistente).
 
 export const ROLES: Record<Rol, { etiqueta: string; descripcion: string }> = {
-    ADMINISTRADOR: { etiqueta: 'Administración', descripcion: 'Toda la provincia. Gestiona usuarios y ve la auditoría.' },
-    EPIDEMIOLOGO: { etiqueta: 'Epidemiología', descripcion: 'Toda la provincia. Valida reportes, analiza y exporta.' },
-    COORDINADOR_BRIGADA: { etiqueta: 'Coordinación de brigada', descripcion: 'Su localidad. Valida, arma rutas y registra intervenciones.' },
+    ADMINISTRADOR: { etiqueta: 'Administración', descripcion: 'Toda la provincia. Gestiona usuarios y ve la auditoría. No ve fotos ni valida.' },
+    EPIDEMIOLOGO: { etiqueta: 'Epidemiología', descripcion: 'Toda la provincia. La única que ve las fotos y valida reportes.' },
+    COORDINADOR_BRIGADA: { etiqueta: 'Coordinación de brigada', descripcion: 'Su localidad. Arma rutas, registra intervenciones y exporta.' },
     BRIGADISTA: { etiqueta: 'Brigadista', descripcion: 'Su localidad. Recorre las rutas asignadas y registra intervenciones.' },
     AUDITOR: { etiqueta: 'Auditoría', descripcion: 'Toda la provincia, solo lectura. Ve la auditoría de accesos.' },
 };
