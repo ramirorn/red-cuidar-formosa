@@ -1,11 +1,13 @@
 import "dotenv/config";
 import bcrypt from "bcryptjs";
 import { PrismaClient, type NivelRiesgo } from "@prisma/client";
+import { asignarZonasAManzanas } from "./zonas.js";
 
 // Carga inicial: localidades priorizadas, primer ADMINISTRADOR y, opcionalmente,
 // una grilla sintética de manzanas para desarrollo local. Es idempotente.
 
 const prisma = new PrismaClient();
+const asignarZonas = (localidadId: number) => asignarZonasAManzanas(prisma, localidadId);
 
 // Coordenadas aproximadas del centro de cada localidad: solo se usan para consultar el clima.
 const LOCALIDADES: { nombre: string; nivelRiesgoBase: NivelRiesgo; latitud: number; longitud: number }[] = [
@@ -97,10 +99,44 @@ const crearGrillaEjemplo = async () => {
     console.log("Grilla sintética de 100 manzanas cargada en Formosa Capital");
 };
 
+// Zonas de la Copa Red-Cuidar sobre la grilla sintética, con nombres de barrios reales de Formosa
+// Capital. Muestra los dos casos: barrios chicos (una zona) y un barrio grande dividido en zonas.
+// Las zonas reales las define la provincia con la administración y se cargan con importar-zonas.
+const ZONAS_EJEMPLO = [
+    { barrio: "San Martín", nombre: "San Martín", columnas: [0, 4], filas: [0, 5] },
+    { barrio: "Centro", nombre: "Centro", columnas: [4, 7], filas: [0, 5] },
+    { barrio: "Villa del Carmen", nombre: "Villa del Carmen", columnas: [7, 10], filas: [0, 5] },
+    { barrio: "Nueva Formosa", nombre: "Nueva Formosa - Zona Oeste", columnas: [0, 4], filas: [5, 10] },
+    { barrio: "Nueva Formosa", nombre: "Nueva Formosa - Zona Centro", columnas: [4, 7], filas: [5, 10] },
+    { barrio: "Nueva Formosa", nombre: "Nueva Formosa - Zona Este", columnas: [7, 10], filas: [5, 10] },
+];
+
+const crearZonasEjemplo = async () => {
+    if (process.env.SEMILLA_MANZANAS_EJEMPLO !== "true") return;
+
+    const localidad = await prisma.localidad.findUniqueOrThrow({ where: { nombre: "Formosa Capital" } });
+    const origen = { longitud: -58.1800, latitud: -26.1900 };
+    const lado = 0.001;
+
+    for (const zona of ZONAS_EJEMPLO) {
+        const [x1, x2] = zona.columnas.map((columna) => origen.longitud + columna * lado) as [number, number];
+        const [y1, y2] = zona.filas.map((fila) => origen.latitud + fila * lado) as [number, number];
+        await prisma.$executeRaw`
+            INSERT INTO "zonaCompetencia" ("localidadId", "barrio", "nombre", "geom", "updatedAt")
+            VALUES (${localidad.id}, ${zona.barrio}, ${zona.nombre},
+                ST_Multi(ST_MakeEnvelope(${x1}::float8, ${y1}::float8, ${x2}::float8, ${y2}::float8, 4326)), now())
+            ON CONFLICT ("localidadId", "nombre") DO UPDATE SET "geom" = EXCLUDED."geom", "barrio" = EXCLUDED."barrio", "updatedAt" = now()
+        `;
+    }
+    const asignadas = await asignarZonas(localidad.id);
+    console.log(`Zonas de ejemplo de la Copa Red-Cuidar: ${ZONAS_EJEMPLO.length} zonas, ${asignadas} manzanas asignadas`);
+};
+
 const main = async () => {
     await crearLocalidades();
     await crearAdministrador();
     await crearGrillaEjemplo();
+    await crearZonasEjemplo();
 };
 
 main()

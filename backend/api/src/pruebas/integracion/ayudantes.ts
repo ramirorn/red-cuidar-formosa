@@ -11,8 +11,8 @@ export { app, prisma };
 
 const TABLAS = [
     'auditoriaAcceso', 'tokenRefresco', 'notificacionEnviada', 'prediccionRiesgo', 'registroMeteorologico',
-    'intervencion', 'paradaRuta', 'rutaBrigada', 'historialEstadoManzana', 'deteccionIa', 'evidencia',
-    'triajeChat', 'suscripcionPush', 'reporte', 'sesionAnonima', 'usuario', 'manzana', 'localidad',
+    'canjePremio', 'intervencion', 'paradaRuta', 'rutaBrigada', 'historialEstadoManzana', 'deteccionIa', 'evidencia',
+    'triajeChat', 'suscripcionPush', 'reporte', 'sesionAnonima', 'usuario', 'manzana', 'zonaCompetencia', 'localidad',
 ];
 
 // Lista fija de tablas (sin datos externos): es seguro armar la sentencia como texto.

@@ -8,6 +8,7 @@ import chatRouter from "./chat.routes.js";
 import authRouter from "./auth.routes.js";
 import institucionalRouter from "./institucional.routes.js";
 import internoRouter from "./interno.routes.js";
+import copaRouter from "./copa.routes.js";
 
 // Se exporta para que la prueba de contrato verifique que cada ruta esté documentada en OpenAPI.
 export const MONTAJES: { prefijo: string; router: Router }[] = [
@@ -18,6 +19,7 @@ export const MONTAJES: { prefijo: string; router: Router }[] = [
     { prefijo: "/localidades", router: localidadRouter },
     { prefijo: "/suscripciones-push", router: suscripcionRouter },
     { prefijo: "/chat", router: chatRouter },
+    { prefijo: "/copa", router: copaRouter },
 
     // API Core del Dashboard Institucional
     { prefijo: "/auth", router: authRouter },

@@ -14,6 +14,7 @@
     "generar-cliente": "prisma generate",
     "semilla": "tsx prisma/semilla.ts",
     "importar-manzanas": "tsx prisma/importarManzanas.ts",
+    "importar-zonas": "tsx prisma/importarZonas.ts",
     "generar-vapid": "web-push generate-vapid-keys"
   },
   "keywords": [],

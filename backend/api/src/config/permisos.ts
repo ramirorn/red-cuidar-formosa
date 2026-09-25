@@ -18,6 +18,8 @@ export const PERMISOS = {
     RUTAS_EJECUTAR: 'rutas:ejecutar',
     USUARIOS_GESTIONAR: 'usuarios:gestionar',
     AUDITORIA_LEER: 'auditoria:leer',
+    // Entregar los premios de la Copa Red-Cuidar (escanear el QR del vecino).
+    PREMIOS_CANJEAR: 'premios:canjear',
 } as const;
 
 export type Permiso = (typeof PERMISOS)[keyof typeof PERMISOS];
@@ -50,6 +52,7 @@ export const PERMISOS_POR_ROL: Record<Rol, readonly Permiso[]> = {
         PERMISOS.RUTAS_LEER,
         PERMISOS.RUTAS_GESTIONAR,
         PERMISOS.RUTAS_EJECUTAR,
+        PERMISOS.PREMIOS_CANJEAR,
     ],
     BRIGADISTA: [
         PERMISOS.REPORTES_LEER,

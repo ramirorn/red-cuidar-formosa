@@ -46,3 +46,5 @@ export const limiteChat = crearLimite(5 * MINUTO, 20, porSesion);
 export const limiteLoginPorIp = crearLimite(15 * MINUTO, 100);
 export const limiteLoginPorCuenta = crearLimite(15 * MINUTO, 10, porCuenta);
 export const limiteRefresco = crearLimite(15 * MINUTO, 20, porTokenDeRefresco);
+// Pedir el premio de la Copa: pocas veces por sesión (frena el probar idCliente al azar).
+export const limitePremio = crearLimite(15 * MINUTO, 10, porSesion);

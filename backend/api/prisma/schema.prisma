@@ -110,6 +110,8 @@ model localidad {
   centroide       Unsupported("geometry(Point, 4326)")?
 
   manzanas                manzana[]
+  zonas                   zonaCompetencia[]
+  canjes                  canjePremio[]
   usuarios                usuario[]
   registrosMeteorologicos registroMeteorologico[]
   rutas                   rutaBrigada[]
@@ -132,8 +134,11 @@ model manzana {
   estadoActualizadoEn DateTime?
   ultimoReporteEn     DateTime?
   ultimaLimpiezaEn    DateTime?
+  // Zona de la Copa Red-Cuidar (barrio, o parte de un barrio grande). Se asigna por ubicación.
+  zonaId              Int?
 
   localidad      localidad                @relation(fields: [localidadId], references: [id])
+  zona           zonaCompetencia?         @relation(fields: [zonaId], references: [id], onDelete: SetNull)
   reportes       reporte[]
   historial      historialEstadoManzana[]
   intervenciones intervencion[]
@@ -148,6 +153,48 @@ model manzana {
   @@index([localidadId, estado])
   @@index([geom], type: Gist)
   @@index([centroide], type: Gist)
+  @@index([zonaId])
+}
+
+// Copa Red-Cuidar: las manzanas compiten agrupadas por barrio. Un barrio grande (Nueva Formosa,
+// Circuito 5) se divide en varias zonas. Las define la provincia junto con la administración.
+model zonaCompetencia {
+  id          Int                                          @id @default(autoincrement())
+  localidadId Int
+  barrio      String                                       @db.VarChar(120)
+  nombre      String                                       @db.VarChar(160)
+  geom        Unsupported("geometry(MultiPolygon, 4326)")
+
+  localidad localidad     @relation(fields: [localidadId], references: [id])
+  manzanas  manzana[]
+  canjes    canjePremio[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([localidadId, nombre])
+  @@index([geom], type: Gist)
+}
+
+// Premio de la Copa: código anónimo que el vecino muestra como QR. No guarda qué reportes lo
+// generaron (así no se vuelven a unir los reportes de una misma persona).
+model canjePremio {
+  id            Int       @id @default(autoincrement())
+  codigo        String    @unique @db.VarChar(20)
+  // Mes de la edición, "AAAA-MM" en hora de Argentina.
+  edicion       String    @db.Char(7)
+  localidadId   Int
+  zonaId        Int
+  emitidoEn     DateTime  @default(now())
+  venceEn       DateTime
+  canjeadoEn    DateTime?
+  canjeadoPorId Int?
+
+  localidad   localidad       @relation(fields: [localidadId], references: [id])
+  zona        zonaCompetencia @relation(fields: [zonaId], references: [id])
+  canjeadoPor usuario?        @relation(fields: [canjeadoPorId], references: [id])
+
+  @@index([edicion, localidadId])
 }
 
 model historialEstadoManzana {
@@ -200,6 +247,8 @@ model reporte {
   validadoPorId     Int?
   validadoEn        DateTime?
   motivoRechazo     String?       @db.VarChar(300)
+  // Ya se usó para pedir el premio de la Copa (un reporte no genera dos premios).
+  premioReclamadoEn DateTime?
 
   manzana          manzana   @relation(fields: [manzanaId], references: [id])
   reporteResuelto  reporte?  @relation("ReporteResuelto", fields: [reporteResueltoId], references: [id], onDelete: SetNull)
@@ -327,6 +376,7 @@ model usuario {
   rutasCoordinadas  rutaBrigada[]     @relation("Coordinador")
   rutasAsignadas    rutaBrigada[]     @relation("Brigadista")
   auditorias        auditoriaAcceso[]
+  canjesPremio      canjePremio[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

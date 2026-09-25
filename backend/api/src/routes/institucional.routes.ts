@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { PERMISOS } from "../config/permisos.js";
 import { listarAuditoria } from "../controllers/auditoria.controllers.js";
+import { canjearPremio, obtenerRankingInstitucional } from "../controllers/copa.controllers.js";
 import { obtenerImagenEvidencia } from "../controllers/evidencia.controllers.js";
 import { exportarIntervenciones, exportarReportes } from "../controllers/exportacion.controllers.js";
 import { listarIntervenciones, registrarIntervencion } from "../controllers/intervencion.controllers.js";
@@ -12,6 +13,7 @@ import { verificarToken } from "../middlewares/autenticacion.middleware.js";
 import { requierePermiso } from "../middlewares/autorizacion.middleware.js";
 import { validarCampos } from "../middlewares/validator.js";
 import { validarListarAuditoria } from "../validators/auditoria.validators.js";
+import { validarCanje, validarRankingInstitucional } from "../validators/copa.validators.js";
 import { validarIdUuid } from "../validators/comun.validators.js";
 import { validarListarIntervenciones, validarRegistrarIntervencion } from "../validators/intervencion.validators.js";
 import { validarConsultaAgregada, validarConsultaPredicciones } from "../validators/metrica.validators.js";
@@ -69,6 +71,10 @@ institucionalRouter.get("/exportaciones/intervenciones", requierePermiso(PERMISO
 institucionalRouter.post("/usuarios", requierePermiso(PERMISOS.USUARIOS_GESTIONAR), validarCrearUsuario, validarCampos, crearUsuario);
 institucionalRouter.get("/usuarios", requierePermiso(PERMISOS.USUARIOS_GESTIONAR), validarListarUsuarios, validarCampos, listarUsuarios);
 institucionalRouter.patch("/usuarios/:id", requierePermiso(PERMISOS.USUARIOS_GESTIONAR), validarActualizarUsuario, validarCampos, actualizarUsuario);
+
+// Copa Red-Cuidar: ranking completo (incluye las zonas críticas) y entrega de premios
+institucionalRouter.get("/copa", requierePermiso(PERMISOS.METRICAS_LEER), validarRankingInstitucional, validarCampos, obtenerRankingInstitucional);
+institucionalRouter.post("/copa/canjes", requierePermiso(PERMISOS.PREMIOS_CANJEAR), validarCanje, validarCampos, canjearPremio);
 
 // Auditoría de accesos a datos sensibles
 institucionalRouter.get("/auditoria", requierePermiso(PERMISOS.AUDITORIA_LEER), validarListarAuditoria, validarCampos, listarAuditoria);

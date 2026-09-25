@@ -305,6 +305,89 @@ paths:
         '400': { $ref: '#/components/responses/SolicitudInvalida' }
         '404': { $ref: '#/components/responses/NoEncontrado' }
 
+  /copa:
+    get:
+      operationId: obtenerPodioCopa
+      summary: Podio de la Copa Red-Cuidar de una localidad
+      description: |
+        Público. Ranking mensual de zonas (barrios o partes de barrios grandes) dentro de la localidad.
+        Devuelve solo el podio (hasta 3 zonas con puntos): los últimos puestos no se publican.
+        Puntos: limpieza validada 10, semana con la manzana en verde 3, criadero validado 1; se rankea
+        por puntos por manzana y, en empate, gana la zona que llegó primero. El mes es el de Argentina.
+      tags: [Copa]
+      security: []
+      parameters:
+        - { name: localidadId, in: query, required: true, schema: { type: integer, minimum: 1 } }
+        - { name: mes, in: query, description: 'AAAA-MM; por defecto, el mes en curso.', schema: { type: string, pattern: '^20\d{2}-(0[1-9]|1[0-2])$' } }
+      responses:
+        '200':
+          description: Edición, podio y cantidad de zonas
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Exito' }
+        '400': { $ref: '#/components/responses/SolicitudInvalida' }
+
+  /copa/zonas/{id}:
+    get:
+      operationId: obtenerSituacionZonaCopa
+      summary: Posición de una zona y cuánto le falta para el podio
+      description: Público. Para los mensajes de la PWA ("les faltan 3 limpiezas para el Top 3").
+      tags: [Copa]
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/IdEntero'
+        - { name: mes, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: Situación de la zona
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Exito' }
+        '400': { $ref: '#/components/responses/SolicitudInvalida' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+
+  /copa/premio:
+    post:
+      operationId: pedirPremioCopa
+      summary: Código anónimo de premio para quien aportó en una zona ganadora
+      description: |
+        El celular envía los idCliente de sus reportes del mes. Si alguno fue validado en una zona del
+        podio (edición definitiva, 72 horas después del cierre), devuelve un código RC-XXXX-XXXX para
+        mostrar como QR. Pedirlo de nuevo devuelve el mismo código; un reporte no genera dos premios.
+        Vence a los 30 días del cierre del mes. `data` es `null` si no corresponde premio.
+      tags: [Copa]
+      security:
+        - sesionAnonima: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mes, idsCliente]
+              properties:
+                mes: { type: string, example: '2026-10' }
+                idsCliente:
+                  type: array
+                  minItems: 1
+                  maxItems: 100
+                  items: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Premio (o null)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Exito' }
+        '400': { $ref: '#/components/responses/SolicitudInvalida' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '409': { $ref: '#/components/responses/Conflicto' }
+        '410':
+          description: Los premios de esa edición vencieron
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '429': { $ref: '#/components/responses/DemasiadasSolicitudes' }
+
   /suscripciones-push/clave-publica:
     get:
       operationId: obtenerClavePublicaPush
@@ -1112,6 +1195,64 @@ paths:
         '404': { $ref: '#/components/responses/NoEncontrado' }
         '422':
           description: Cambio no permitido (por ejemplo, desactivarse a sí mismo)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /institucional/copa:
+    get:
+      operationId: obtenerRankingCopa
+      summary: Ranking completo de la Copa (incluye las zonas críticas)
+      description: 'Permiso `metricas:leer`. Los roles provinciales deben indicar `localidadId`. Incluye premios emitidos y canjeados por zona.'
+      tags: [Copa]
+      security:
+        - institucional: []
+      parameters:
+        - $ref: '#/components/parameters/LocalidadId'
+        - { name: mes, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: Ranking de todas las zonas
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Exito' }
+        '400': { $ref: '#/components/responses/SolicitudInvalida' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+
+  /institucional/copa/canjes:
+    post:
+      operationId: canjearPremioCopa
+      summary: Entrega un premio (escaneo del QR del vecino)
+      description: |
+        Permiso `premios:canjear` (Coordinación de brigada y Administración), con alcance territorial.
+        Acepta el texto del QR (`REDCUIDAR:RC-XXXX-XXXX`) o el código tipeado. Un premio se entrega una
+        sola vez y queda en la auditoría (`CANJEAR_PREMIO`).
+      tags: [Copa]
+      security:
+        - institucional: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [codigo]
+              properties:
+                codigo: { type: string, example: 'RC-7K2M-9QXA' }
+      responses:
+        '200':
+          description: Premio entregado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Exito' }
+        '400': { $ref: '#/components/responses/SolicitudInvalida' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409': { $ref: '#/components/responses/Conflicto' }
+        '410':
+          description: El premio venció
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }

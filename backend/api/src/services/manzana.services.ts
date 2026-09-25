@@ -193,6 +193,7 @@ interface FilaManzanaMapa {
     codigo: string;
     estado: EstadoManzana;
     localidadId: number;
+    zonaId: number | null;
     geometria: unknown;
 }
 
@@ -209,7 +210,7 @@ export const listarManzanasService = async (recuadro: RecuadroMapa) => {
     }
 
     const filas = await prisma.$queryRaw<FilaManzanaMapa[]>`
-        SELECT m."id", m."codigo", m."estado", m."localidadId",
+        SELECT m."id", m."codigo", m."estado", m."localidadId", m."zonaId",
                ST_AsGeoJSON(m."geom", 6)::json AS "geometria"
         FROM "manzana" m
         WHERE m."geom" && ST_MakeEnvelope(
@@ -224,7 +225,7 @@ export const listarManzanasService = async (recuadro: RecuadroMapa) => {
             type: 'Feature',
             id: fila.id,
             geometry: fila.geometria,
-            properties: { codigo: fila.codigo, estado: fila.estado, localidadId: fila.localidadId },
+            properties: { codigo: fila.codigo, estado: fila.estado, localidadId: fila.localidadId, zonaId: fila.zonaId },
         })),
     };
 };
@@ -238,7 +239,7 @@ export const listarManzanasDeLocalidadService = async (localidadId: number) => {
     if (!localidad) throw new ErrorHttp(404, 'Recurso no encontrado');
 
     const filas = await prisma.$queryRaw<FilaManzanaMapa[]>`
-        SELECT m."id", m."codigo", m."estado", m."localidadId",
+        SELECT m."id", m."codigo", m."estado", m."localidadId", m."zonaId",
                ST_AsGeoJSON(m."geom", 5)::json AS "geometria"
         FROM "manzana" m
         WHERE m."localidadId" = ${localidadId}
@@ -252,7 +253,7 @@ export const listarManzanasDeLocalidadService = async (localidadId: number) => {
             type: 'Feature',
             id: fila.id,
             geometry: fila.geometria,
-            properties: { codigo: fila.codigo, estado: fila.estado, localidadId: fila.localidadId },
+            properties: { codigo: fila.codigo, estado: fila.estado, localidadId: fila.localidadId, zonaId: fila.zonaId },
         })),
     };
 };

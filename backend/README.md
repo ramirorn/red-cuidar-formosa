@@ -134,6 +134,31 @@ n8n dispara `POST /api/interno/manzanas/recalcular` después de cada lluvia y un
 - **Predicción a 72 h:** el mismo índice sumando la lluvia pronosticada, porque vuelve a llenar los recipientes.
   Se recalcula cada hora cuando n8n actualiza el clima, dura 24 h y se conservan 30 días de historial.
 
+## Copa Red-Cuidar (ranking mensual por zonas)
+
+Dentro de cada localidad compiten las **zonas**: un barrio, o una parte de un barrio grande (Nueva Formosa,
+Circuito 5). Las define la provincia con la administración y se cargan desde un GeoJSON:
+
+```bash
+npm run importar-zonas -- --localidad "Formosa Capital" --archivo zonas.geojson [--reemplazar]
+```
+
+Cada feature lleva `barrio` y `nombre` (por ejemplo "Nueva Formosa - Zona Norte"). Cada manzana queda en la
+zona que contiene su centro; las que no caen en ninguna no compiten. La semilla carga 6 zonas de ejemplo
+sobre la grilla sintética.
+
+- **Puntos** (solo lo que valida Epidemiología): limpieza validada 10, semana con la manzana en verde al cierre
+  del domingo 3, criadero validado 1. Se rankea por **puntos por manzana** (un barrio grande no gana por tamaño);
+  en empate gana la zona que llegó primero.
+- **Edición mensual** en hora de Argentina. El resultado es definitivo 72 horas después del cierre (el tiempo que
+  tienen los últimos reportes para revisarse).
+- **Público:** solo el podio (Top 3) y la situación de la propia zona ("les faltan N limpiezas"). Los últimos
+  puestos solo se ven en el panel.
+- **Premio anónimo:** quien tiene reportes validados en una zona del podio pide un código `RC-XXXX-XXXX` (se muestra
+  como QR) enviando los `idCliente` que guarda su celular. Un reporte no genera dos premios y no se guarda qué
+  reportes generaron cada código. Vence a los 30 días del cierre. Coordinación y Administración lo canjean desde
+  el panel (una sola vez, con auditoría).
+
 ## Control de acceso (RBAC)
 
 Cada ruta institucional pasa por `verificarToken → requierePermiso(permiso) → validación → controlador`.
@@ -155,6 +180,7 @@ Si alguien pide un recurso de otra localidad, recibe 404, así no puede confirma
 | Ejecutar rutas (iniciar, marcar paradas) | ✔ | | ✔ | ✔ (no puede cancelar) | |
 | Gestionar usuarios | ✔ | | | | |
 | Leer auditoría | ✔ | | | | ✔ |
+| Entregar premios de la Copa | ✔ | | ✔ | | |
 | **Alcance** | Provincia | Provincia | Su localidad | Su localidad | Provincia |
 
 - **ADMINISTRADOR:** gestión de cuentas y del sistema. No ve fotos ni valida: no siempre conoce el tema.
@@ -188,6 +214,8 @@ cercano desde el punto de partida. Una intervención registrada con `paradaRutaI
 | POST | `/api/reportes` | Multipart: `imagenes` (1 a 3 recortes JPEG/PNG/WebP, ≤ 5 MB), `idCliente` (UUID de la PWA), `tipo`, `manzanaId`, `capturadoEn`, `confianzaIa?`, `descripcion?`, `detecciones?` (JSON), `idClienteResuelto?`. Es idempotente por `idCliente`: responde 201 si lo crea y 200 si ya existía. |
 | POST | `/api/reportes/consulta` | Estado de los reportes propios, por la lista de `idCliente` que guarda el celular. |
 | GET | `/api/localidades/:id/manzanas` | Todas las manzanas de una localidad, para calcular la manzana en el celular. |
+| GET | `/api/copa?localidadId&mes` · `/api/copa/zonas/:id?mes` | Podio de la Copa y situación de una zona (público). |
+| POST | `/api/copa/premio` | Código anónimo de premio para quien aportó en una zona ganadora. |
 | GET | `/api/manzanas?longitudMinima&latitudMinima&longitudMaxima&latitudMaxima` | GeoJSON público del mapa comunitario (recuadro ≤ 0,1°). |
 | POST / DELETE | `/api/suscripciones-push` | Alta y baja de la suscripción Web Push. |
 
@@ -209,6 +237,8 @@ cercano desde el punto de partida. Una intervención registrada con `paradaRutaI
 | GET | `/api/institucional/brigadistas` (para asignar rutas) | `rutas:gestionar` |
 | PATCH | `/api/institucional/rutas/:id/estado` · `/rutas/:id/paradas/:paradaId/visitada` | `rutas:ejecutar` |
 | GET | `/api/institucional/auditoria` | `auditoria:leer` |
+| GET | `/api/institucional/copa?localidadId&mes` | `metricas:leer` |
+| POST | `/api/institucional/copa/canjes` | `premios:canjear` |
 
 Los listados usan paginación por cursor (`limite` ≤ 200, `cursor` opaco) y los rangos de fecha tienen un máximo de 366 días.
 
