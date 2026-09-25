@@ -3,7 +3,7 @@
 #
 # Redes:
 #  - red_interna (sin salida a internet): base de datos, Redis y motor predictivo.
-#  - red_publica: servicios que exponen puertos o necesitan internet (API y n8n).
+#  - red_publica: servicios que exponen puertos o necesitan internet (frontend, API y n8n).
 
 services:
   db:
@@ -81,6 +81,27 @@ services:
         condition: service_healthy
     networks:
       - red_interna
+      - red_publica
+
+  frontend:
+    build: ../frontend
+    container_name: rcf_frontend
+    restart: always
+    mem_limit: 1g
+    environment:
+      # El proxy de Vite reenvía /api a la API: el navegador ve un solo origen (cookies SameSite=Strict).
+      URL_API: http://api:3000
+      # En Docker Desktop (Mac/Windows) los cambios de archivos montados no siempre llegan por inotify.
+      VIGILAR_CON_SONDEO: ${VIGILAR_CON_SONDEO:-}
+    ports:
+      - "5173:5173"
+    volumes:
+      # Recarga en caliente del código fuente.
+      - ../frontend/src:/app/src:ro
+      - ../frontend/public:/app/public:ro
+    depends_on:
+      - api
+    networks:
       - red_publica
 
   motor-predictivo:

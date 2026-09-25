@@ -1,8 +1,5 @@
 node_modules
 dist
 dev-dist
-.env
-*.log
-.vscode/
-.DS_Store
 *.tsbuildinfo
+agentes

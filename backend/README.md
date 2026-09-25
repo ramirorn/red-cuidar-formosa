@@ -7,6 +7,7 @@ anónima y el personal de salud los gestiona desde un dashboard institucional.
 
 | Carpeta | Servicio | Tecnología | Expuesto |
 |---|---|---|---|
+| `../frontend/` | PWA del vecino (`/app`) y panel institucional (`/panel`) | React 19, Vite, Tailwind 4 | `:5173` |
 | `api/` | API de Recepción de Evidencia + API Core del Dashboard Institucional | Node 22, Express 5, Prisma 5, TypeScript | `:3000` |
 | `motor-predictivo/` | Mapa de calor, índice de riesgo y predicción a 72 h | Python 3.12, FastAPI, asyncpg | No (red interna) |
 | `orquestador/` | Alertas por clima, chat con LLM, tareas programadas | n8n + Ollama (`nemotron-3-nano:4b`) | `127.0.0.1:5678` |
@@ -29,6 +30,9 @@ docker compose exec api npm run semilla   # localidades, primer administrador y 
   Para correrlo dentro de Docker: `docker compose --profile ollama-contenedor up -d` y
   `URL_OLLAMA=http://ollama:11434` en `.env`.
 - El código de `api/src` y `motor-predictivo/app` se monta en los contenedores con recarga en caliente.
+- Frontend en `http://localhost:5173`: PWA del vecino en `/app` y panel institucional en `/panel`.
+  Vite reenvía `/api` a la API, así el navegador ve un solo origen (necesario para la cookie de refresco).
+  En Docker Desktop (Mac/Windows), si la recarga en caliente no detecta cambios: `VIGILAR_CON_SONDEO=1` en `.env`.
 - La base no publica puertos: `docker compose exec db psql -U postgres -d red_cuidar`.
 
 Pruebas:
@@ -156,6 +160,7 @@ cercano desde el punto de partida. Una intervención registrada con `paradaRutaI
 | Método | Ruta | Permiso |
 |---|---|---|
 | POST | `/api/auth/login` · `/api/auth/refrescar` · `/api/auth/cerrar-sesion` | — |
+| GET | `/api/auth/yo` (usuario actual, localidad y permisos para armar el menú) | Sesión |
 | GET | `/api/institucional/reportes` · `/reportes/:id` | `reportes:leer` |
 | PATCH | `/api/institucional/reportes/:id/estado` | `reportes:validar` |
 | GET | `/api/institucional/evidencias/:id/imagen` | `evidencias:ver` |
@@ -165,6 +170,7 @@ cercano desde el punto de partida. Una intervención registrada con `paradaRutaI
 | GET | `/api/institucional/exportaciones/reportes` · `/exportaciones/intervenciones` | `exportaciones:descargar` |
 | POST / GET / PATCH | `/api/institucional/usuarios` | `usuarios:gestionar` |
 | POST / GET | `/api/institucional/rutas` · GET `/rutas/:id` | `rutas:gestionar` / `rutas:leer` |
+| GET | `/api/institucional/brigadistas` (para asignar rutas) | `rutas:gestionar` |
 | PATCH | `/api/institucional/rutas/:id/estado` · `/rutas/:id/paradas/:paradaId/visitada` | `rutas:ejecutar` |
 | GET | `/api/institucional/auditoria` | `auditoria:leer` |
 
