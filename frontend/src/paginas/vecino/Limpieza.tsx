@@ -27,7 +27,7 @@ export default function Limpieza() {
 
             <Tarjeta className="p-4">
                 <h2 className="font-extrabold">Antes de sacar la foto</h2>
-                <ol className="mt-3 grid grid-cols-2 gap-3">
+                <ol className="mt-3 grid grid-cols-1 gap-3 min-[360px]:grid-cols-2">
                     {PASOS.map(({ Icono, texto }, indice) => (
                         <li key={texto} className="flex items-start gap-2 rounded-2xl bg-verde-50 p-3 text-sm font-bold text-verde-800">
                             <Icono className="size-5 shrink-0" aria-hidden />

@@ -102,8 +102,8 @@ export default function MisReportes() {
 
                 {!isLoading && !error && visibles.length === 0 && (
                     <div className="rounded-tarjeta bg-white px-6 py-10 text-center shadow-suave">
-                        <Manuscrita className="text-3xl text-verde-600">{filtro === 'TODOS' ? 'Todavía no reportaste nada' : 'No hay reportes con este estado'}</Manuscrita>
-                        {filtro === 'TODOS' && <BotonEnlace to="/app/escanear?nuevo=1" className="mt-5">¡Escaneá tu patio!</BotonEnlace>}
+                        <Manuscrita className="block text-3xl leading-tight text-verde-600">{filtro === 'TODOS' ? 'Todavía no reportaste nada' : 'No hay reportes con este estado'}</Manuscrita>
+                        {filtro === 'TODOS' && <div className="mt-5"><BotonEnlace to="/app/escanear?nuevo=1">¡Escaneá tu patio!</BotonEnlace></div>}
                     </div>
                 )}
 

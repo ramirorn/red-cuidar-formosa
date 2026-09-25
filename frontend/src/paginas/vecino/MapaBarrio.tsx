@@ -19,7 +19,8 @@ export default function MapaBarrio() {
     const [recuadro, setRecuadro] = useState<Recuadro | null>(null);
     const [zoomBajo, setZoomBajo] = useState(false);
     const [seleccionada, setSeleccionada] = useState<FeatureManzana | null>(null);
-    const [leyendaAbierta, setLeyendaAbierta] = useState(true);
+    // En el celular la leyenda arranca cerrada para no tapar el mapa.
+    const [leyendaAbierta, setLeyendaAbierta] = useState(() => window.matchMedia('(min-width: 1024px)').matches);
     const [buscando, setBuscando] = useState(false);
     // Se descargan todas las manzanas de la localidad y se dibujan solo las visibles:
     // mover el mapa no le dice al servidor qué zona está mirando el vecino.

@@ -203,7 +203,7 @@ export default function InicioVecino() {
 
     // Celular: una columna. Computadora: acciones a la izquierda y el mapa de tu manzana a la derecha.
     return (
-        <div className="grid gap-5 px-4 py-6 lg:grid-cols-[1fr_1.15fr] lg:items-start lg:gap-x-10 lg:gap-y-6 lg:py-10">
+        <div className="grid grid-cols-1 gap-5 px-4 py-6 lg:grid-cols-[1fr_1.15fr] lg:items-start lg:gap-x-10 lg:gap-y-6 lg:py-10">
             <div className="lg:col-start-1 lg:row-start-1">
                 <h1 className="text-2xl font-black lg:text-4xl">¡Hola, vecino!</h1>
                 <Manuscrita className="text-2xl text-verde-600 lg:text-3xl">Cuidemos el barrio juntos</Manuscrita>
