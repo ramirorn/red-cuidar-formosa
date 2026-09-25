@@ -124,6 +124,10 @@ Si alguien pide un recurso de otra localidad, recibe 404, así no puede confirma
 - **BRIGADISTA:** trabaja en el campo; ve reportes y fotos de su localidad y registra lo que hizo.
 - **AUDITOR:** control externo de solo lectura; ve métricas y auditoría, pero no las fotos de los domicilios.
 
+La ubicación de un reporte (casi siempre la casa de un vecino) es exacta solo para ADMINISTRADOR,
+COORDINADOR_BRIGADA y BRIGADISTA, que tienen que ir al lugar; EPIDEMIOLOGO y AUDITOR la ven redondeada (≈ 110 m).
+Cada vista de una foto de evidencia queda registrada en la auditoría (`VER_EVIDENCIA`).
+
 Rol, localidad y estado activo se leen de la base en cada petición: una baja o un cambio de rol
 tiene efecto inmediato, aunque el token de acceso todavía no haya vencido.
 

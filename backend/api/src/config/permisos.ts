@@ -74,6 +74,10 @@ export const ROLES_PROVINCIALES: readonly Rol[] = ['ADMINISTRADOR', 'EPIDEMIOLOG
 // Solo estos roles exportan coordenadas exactas; el resto las recibe redondeadas (~100 m).
 export const ROLES_COORDENADAS_EXACTAS: readonly Rol[] = ['ADMINISTRADOR'];
 
+// En el detalle de un reporte, la ubicación exacta (casi siempre la casa de un vecino) solo la ven
+// quienes tienen que ir al lugar o administran el sistema; análisis y auditoría la ven redondeada.
+export const ROLES_UBICACION_EXACTA_EN_DETALLE: readonly Rol[] = ['ADMINISTRADOR', 'COORDINADOR_BRIGADA', 'BRIGADISTA'];
+
 export const tienePermiso = (rol: Rol, permiso: Permiso): boolean => PERMISOS_POR_ROL[rol].includes(permiso);
 
 export const esRolProvincial = (rol: Rol): boolean => ROLES_PROVINCIALES.includes(rol);

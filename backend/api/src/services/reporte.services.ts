@@ -1,6 +1,6 @@
 import { Prisma, type ClaseObjeto, type EstadoReporte, type OrigenReporte, type TipoReporte } from '@prisma/client';
 import prisma from '../config/prisma.js';
-import { esRolProvincial, ROLES_COORDENADAS_EXACTAS } from '../config/permisos.js';
+import { esRolProvincial, ROLES_COORDENADAS_EXACTAS, ROLES_UBICACION_EXACTA_EN_DETALLE } from '../config/permisos.js';
 import type { UsuarioAutenticado } from '../middlewares/autenticacion.middleware.js';
 import { alcanceLocalidad, verificarAlcance } from '../utils/alcance.js';
 import { ErrorHttp } from '../utils/errorHttp.js';
@@ -302,12 +302,15 @@ export const obtenerReporteService = async (usuario: UsuarioAutenticado, id: str
     if (!reporte) throw new ErrorHttp(404, 'Recurso no encontrado');
     verificarAlcance(usuario, reporte.manzana?.localidadId);
 
+    const exacta = ROLES_UBICACION_EXACTA_EN_DETALLE.includes(usuario.rol);
+    const decimales = exacta ? 6 : 3;
     const [ubicacion] = await prisma.$queryRaw<{ latitud: number; longitud: number }[]>`
-        SELECT ST_Y("ubicacion"::geometry) AS "latitud", ST_X("ubicacion"::geometry) AS "longitud"
+        SELECT ROUND(ST_Y("ubicacion"::geometry)::numeric, ${decimales}::int)::float8 AS "latitud",
+               ROUND(ST_X("ubicacion"::geometry)::numeric, ${decimales}::int)::float8 AS "longitud"
         FROM "reporte" WHERE "id" = ${id}::uuid
     `;
 
-    return { ...reporte, ubicacion: ubicacion ?? null };
+    return { ...reporte, ubicacion: ubicacion ? { ...ubicacion, exacta } : null };
 };
 
 // Transiciones permitidas del ciclo de vida de un reporte.

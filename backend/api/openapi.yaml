@@ -486,6 +486,9 @@ paths:
     get:
       operationId: obtenerReporte
       summary: Detalle de un reporte, con ubicación, detecciones y evidencias
+      description: |
+        La ubicación es exacta para ADMINISTRADOR, COORDINADOR_BRIGADA y BRIGADISTA; para el resto se
+        redondea a 3 decimales (≈ 110 m). `ubicacion.exacta` indica cuál se recibió.
       tags: [Reportes]
       security:
         - institucional: []
@@ -540,7 +543,7 @@ paths:
     get:
       operationId: obtenerImagenEvidencia
       summary: Descarga la foto de una evidencia
-      description: 'Permiso `evidencias:ver`, con alcance territorial.'
+      description: 'Permiso `evidencias:ver`, con alcance territorial. Cada descarga queda en la auditoría (`VER_EVIDENCIA`).'
       tags: [Evidencias]
       security:
         - institucional: []

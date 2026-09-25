@@ -70,6 +70,30 @@ describe('alcance territorial con datos reales', () => {
         expect(foto.body.subarray(0, 2).toString('hex')).toBe('ffd8');
     });
 
+    it('la ubicación es exacta para el coordinador y redondeada para el epidemiólogo', async () => {
+        const coordinador = await crearUsuario('COORDINADOR_BRIGADA', territorio.localidades.capital);
+        const epidemiologo = await crearUsuario('EPIDEMIOLOGO');
+        const decimales = (numero: number) => String(numero).split('.')[1]?.length ?? 0;
+
+        const paraCoordinador = await request(app).get(`/api/institucional/reportes/${reporteCapital}`).set(conToken(coordinador.token));
+        const paraEpidemiologo = await request(app).get(`/api/institucional/reportes/${reporteCapital}`).set(conToken(epidemiologo.token));
+
+        expect(paraCoordinador.body.data.ubicacion.exacta).toBe(true);
+        expect(decimales(paraCoordinador.body.data.ubicacion.latitud)).toBeGreaterThan(3);
+        expect(paraEpidemiologo.body.data.ubicacion.exacta).toBe(false);
+        expect(decimales(paraEpidemiologo.body.data.ubicacion.latitud)).toBeLessThanOrEqual(3);
+    });
+
+    it('ver una foto queda registrado en la auditoría', async () => {
+        const coordinador = await crearUsuario('COORDINADOR_BRIGADA', territorio.localidades.capital);
+        const evidencia = await prisma.evidencia.findFirstOrThrow({ where: { reporteId: reporteCapital } });
+
+        await request(app).get(`/api/institucional/evidencias/${evidencia.id}/imagen`).set(conToken(coordinador.token)).expect(200);
+
+        const registro = await prisma.auditoriaAcceso.findFirstOrThrow({ where: { accion: 'VER_EVIDENCIA' } });
+        expect(registro).toMatchObject({ usuarioId: coordinador.id, recurso: `evidencia:${evidencia.id}` });
+    });
+
     it('un auditor no puede ver fotos aunque tenga alcance provincial', async () => {
         const auditor = await crearUsuario('AUDITOR');
         const evidencia = await prisma.evidencia.findFirstOrThrow({ where: { reporteId: reporteCapital } });
