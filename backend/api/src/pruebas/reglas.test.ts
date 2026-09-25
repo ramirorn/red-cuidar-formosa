@@ -91,6 +91,11 @@ describe('escaparCsv', () => {
         expect(escaparCsv('+54 370')).toBe("'+54 370");
     });
 
+    it('entrecomilla el punto y coma y detecta fórmulas con espacios adelante', () => {
+        expect(escaparCsv('tanque;=HYPERLINK("http://x")')).toBe('"tanque;=HYPERLINK(""http://x"")"');
+        expect(escaparCsv('  =1+1')).toBe("'  =1+1");
+    });
+
     it('respeta números negativos y comillas', () => {
         expect(escaparCsv(-26.19)).toBe('-26.19');
         expect(escaparCsv('texto, con "comillas"')).toBe('"texto, con ""comillas"""');

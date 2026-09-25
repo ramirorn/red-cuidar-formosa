@@ -1,5 +1,6 @@
 import type { Response } from 'express';
-import { once } from 'node:events';
+import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import { matchedData } from 'express-validator';
 import type { AuthRequest } from '../middlewares/autenticacion.middleware.js';
 import { registrarAuditoriaService } from '../services/auditoria.services.js';
@@ -16,8 +17,7 @@ import { resolverRango } from '../utils/rangoFechas.js';
 
 type Generador = (usuario: UsuarioAutenticado, filtros: Record<string, any>) => AsyncGenerator<unknown[]>;
 
-// Transmite el CSV fila por fila respetando la contrapresión del socket: la memoria
-// usada no depende del tamaño del informe.
+// Transmite el CSV fila por fila: la memoria usada no depende del tamaño del informe.
 const exportarCsv = (recurso: string, columnas: string[], generar: Generador) => async (req: AuthRequest, res: Response) => {
     const filtros = matchedData(req, { locations: ['query'] });
     const usuario = req.usuario!;
@@ -46,18 +46,20 @@ const exportarCsv = (recurso: string, columnas: string[], generar: Generador) =>
             'Content-Disposition': `attachment; filename="${recurso}-${fecha}.csv"`,
             'Cache-Control': 'no-store',
         });
-        // BOM para que las planillas de cálculo reconozcan UTF-8 (tildes y eñes).
-        res.write('﻿' + filaCsv(columnas));
 
-        for await (const fila of generar(usuario, filtros)) {
-            if (!res.write(filaCsv(fila))) await once(res, 'drain');
+        // pipeline respeta la contrapresión del socket y, si el cliente corta la descarga,
+        // cierra el generador (y con él las consultas por lotes) en lugar de quedar esperando.
+        async function* lineas() {
+            // BOM para que las planillas de cálculo reconozcan UTF-8 (tildes y eñes).
+            yield '\uFEFF' + filaCsv(columnas);
+            for await (const fila of generar(usuario, filtros)) yield filaCsv(fila);
         }
-
-        res.end();
+        await pipeline(Readable.from(lineas()), res);
 
     } catch (error) {
         if (res.headersSent) {
-            console.error(error);
+            // Una descarga cancelada por el cliente no es un error del servidor.
+            if ((error as NodeJS.ErrnoException)?.code !== 'ERR_STREAM_PREMATURE_CLOSE') console.error(error);
             res.destroy();
             return;
         }
