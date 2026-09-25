@@ -2,6 +2,7 @@ import { Router } from "express";
 import sesionRouter from "./sesion.routes.js";
 import reporteRouter from "./reporte.routes.js";
 import manzanaRouter from "./manzana.routes.js";
+import localidadRouter from "./localidad.routes.js";
 import suscripcionRouter from "./suscripcion.routes.js";
 import chatRouter from "./chat.routes.js";
 import authRouter from "./auth.routes.js";
@@ -14,6 +15,7 @@ export const MONTAJES: { prefijo: string; router: Router }[] = [
     { prefijo: "/sesiones", router: sesionRouter },
     { prefijo: "/reportes", router: reporteRouter },
     { prefijo: "/manzanas", router: manzanaRouter },
+    { prefijo: "/localidades", router: localidadRouter },
     { prefijo: "/suscripciones-push", router: suscripcionRouter },
     { prefijo: "/chat", router: chatRouter },
 

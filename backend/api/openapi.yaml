@@ -234,6 +234,34 @@ paths:
                       data: { $ref: '#/components/schemas/ColeccionGeoJson' }
         '400': { $ref: '#/components/responses/SolicitudInvalida' }
 
+  /localidades:
+    get:
+      operationId: listarLocalidades
+      summary: Localidades con su punto de referencia
+      description: Público. Catálogo para selectores y para centrar el mapa (cacheable 1 hora).
+      tags: [Ciudadanía]
+      security: []
+      responses:
+        '200':
+          description: Lista de localidades
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Exito'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id: { type: integer }
+                            nombre: { type: string }
+                            nivelRiesgoBase: { type: string, enum: [CRITICO, ALTO, MODERADO_ALTO, MODERADO] }
+                            latitud: { type: [number, 'null'] }
+                            longitud: { type: [number, 'null'] }
+
   /suscripciones-push/clave-publica:
     get:
       operationId: obtenerClavePublicaPush
