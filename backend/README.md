@@ -20,8 +20,17 @@ anónima y el personal de salud los gestiona desde un dashboard institucional.
 cd backend
 cp .env.example .env            # completar claves y secretos
 docker compose up --build -d
-docker compose exec api npm run semilla   # localidades, primer administrador y grilla de ejemplo
+docker compose exec api npm run semilla   # localidades, primer administrador y manzanas
 ```
+
+- **Manzanas y barrios reales (OpenStreetMap).** Una sola vez, en una compu con internet:
+  `docker compose exec api npm run importar-osm -- --reemplazar`. Descarga las calles y barrios de Formosa Capital,
+  arma las manzanas (lo que queda entre calles) y las zonas de la Copa, y guarda la descarga en
+  `prisma/datos/osm-formosa-capital.json.gz` dentro del contenedor. Copialo al repositorio y subilo:
+  `docker compose cp api:/app/prisma/datos/osm-formosa-capital.json.gz api/prisma/datos/`. Desde ahí la semilla usa
+  las manzanas reales sin internet. `--reemplazar` borra lo que colgaba de las manzanas anteriores (reportes, rutas,
+  intervenciones y premios de esa localidad). Otra localidad: `--localidad "Clorinda"` (o `--bbox sur,oeste,norte,este`);
+  `--descargar` vuelve a bajar los datos. Sin ese archivo, la semilla carga una grilla sintética de 100 manzanas.
 
 - Flujos de n8n: `docker compose exec n8n sh /orquestador/importar.sh && docker compose restart n8n`
   (ver `orquestador/README.md`).
@@ -144,8 +153,9 @@ npm run importar-zonas -- --localidad "Formosa Capital" --archivo zonas.geojson 
 ```
 
 Cada feature lleva `barrio` y `nombre` (por ejemplo "Nueva Formosa - Zona Norte"). Cada manzana queda en la
-zona que contiene su centro; las que no caen en ninguna no compiten. La semilla carga 6 zonas de ejemplo
-sobre la grilla sintética.
+zona que contiene su centro; las que no caen en ninguna no compiten. `importar-osm` arma zonas automáticas con los
+barrios de OpenStreetMap (los de menos de 10 manzanas se suman al vecino y los de más de 120 se parten en zonas de
+~80, por ejemplo "Nueva Formosa - Zona Norte"); se reemplazan cuando la provincia defina las oficiales.
 
 - **Puntos** (solo lo que valida Epidemiología): limpieza validada 10, semana con la manzana en verde al cierre
   del domingo 3, criadero validado 1. Se rankea por **puntos por manzana** (un barrio grande no gana por tamaño);

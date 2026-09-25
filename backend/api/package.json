@@ -15,6 +15,7 @@
     "semilla": "tsx prisma/semilla.ts",
     "importar-manzanas": "tsx prisma/importarManzanas.ts",
     "importar-zonas": "tsx prisma/importarZonas.ts",
+    "importar-osm": "tsx prisma/importarOsm.ts",
     "generar-vapid": "web-push generate-vapid-keys"
   },
   "keywords": [],

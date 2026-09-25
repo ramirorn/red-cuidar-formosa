@@ -1,6 +1,7 @@
 import "dotenv/config";
 import bcrypt from "bcryptjs";
 import { PrismaClient, type NivelRiesgo } from "@prisma/client";
+import { cargarDesdeOsm, leerCache } from "../src/utils/osm.js";
 import { asignarZonasAManzanas } from "./zonas.js";
 
 // Carga inicial: localidades priorizadas, primer ADMINISTRADOR y, opcionalmente,
@@ -132,11 +133,29 @@ const crearZonasEjemplo = async () => {
     console.log(`Zonas de ejemplo de la Copa Red-Cuidar: ${ZONAS_EJEMPLO.length} zonas, ${asignadas} manzanas asignadas`);
 };
 
+// Si el repositorio trae la descarga de OpenStreetMap (npm run importar-osm), se usan las manzanas y
+// barrios reales; si no, la grilla sintética. En ambos casos solo cuando la localidad no tiene manzanas.
+const crearManzanas = async () => {
+    if (process.env.SEMILLA_MANZANAS_EJEMPLO !== "true") return;
+    const localidad = await prisma.localidad.findUniqueOrThrow({ where: { nombre: "Formosa Capital" } });
+    if (await prisma.manzana.count({ where: { localidadId: localidad.id } }) > 0) {
+        console.log("Formosa Capital ya tiene manzanas: no se tocan");
+        return;
+    }
+    const osm = await leerCache(localidad.nombre);
+    if (osm) {
+        const resultado = await cargarDesdeOsm(prisma, localidad.id, osm, { reemplazar: false });
+        console.log(`Manzanas reales de OpenStreetMap: ${resultado.manzanas} manzanas en ${resultado.zonas} zonas de la Copa`);
+        return;
+    }
+    await crearGrillaEjemplo();
+    await crearZonasEjemplo();
+};
+
 const main = async () => {
     await crearLocalidades();
     await crearAdministrador();
-    await crearGrillaEjemplo();
-    await crearZonasEjemplo();
+    await crearManzanas();
 };
 
 main()

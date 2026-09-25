@@ -92,7 +92,7 @@ const Portada = () => (
                 </div>
                 <Tarjeta className="absolute bottom-10 -left-1 flex -rotate-2 items-center gap-3 px-4 py-3 sm:left-0">
                     <ChipEstado estado="VERDE" tamano="chico" />
-                    <span className="text-sm font-bold">Manzana EJ-0404</span>
+                    <span className="text-sm font-bold">Manzana M-00404</span>
                 </Tarjeta>
             </div>
         </Contenedor>

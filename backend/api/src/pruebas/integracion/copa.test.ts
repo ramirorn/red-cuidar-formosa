@@ -168,7 +168,7 @@ describe('premio anónimo', () => {
         // Pedirlo con cada reporte por separado: o se rechaza, o devuelve el mismo premio (nunca uno nuevo).
         for (const idCliente of [ganador.idCliente, otro.idCliente]) {
             const resultado = await pedirPremioService(MES, [idCliente], DEFINITIVA).catch((error: { estado: number }) => error);
-            if ('estado' in resultado) expect(resultado.estado).toBe(409);
+            if (resultado && 'estado' in resultado) expect(resultado.estado).toBe(409);
             else expect(resultado!.codigo).toBe(codigo);
         }
         expect(await prisma.canjePremio.count()).toBe(1);
