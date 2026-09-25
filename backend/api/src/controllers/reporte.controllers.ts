@@ -4,7 +4,7 @@ import type { AuthRequest } from '../middlewares/autenticacion.middleware.js';
 import {
     cambiarEstadoReporteService,
     crearReporteService,
-    listarMisReportesService,
+    consultarMisReportesService,
     listarReportesService,
     obtenerReporteService,
     type DatosReporte,
@@ -33,16 +33,15 @@ export const crearReporte = async (req: AuthRequest, res: Response) => {
     }
 };
 
-export const listarMisReportes = async (req: AuthRequest, res: Response) => {
-    const { limite, cursor } = matchedData(req, { locations: ['query'] });
+export const consultarMisReportes = async (req: AuthRequest, res: Response) => {
+    const { idsCliente } = matchedData(req, { locations: ['body'] }) as { idsCliente: string[] };
 
     try {
-        const { datos, paginacion } = await listarMisReportesService(req.sesion!.id, limiteDeConsulta(limite), cursor);
+        const reportes = await consultarMisReportesService(idsCliente);
 
         res.status(200).json({
             status: 'success',
-            data: datos,
-            pagination: paginacion,
+            data: reportes,
         });
 
     } catch (error) {

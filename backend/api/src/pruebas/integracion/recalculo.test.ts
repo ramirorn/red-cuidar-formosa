@@ -1,7 +1,7 @@
 import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { recalcularEstadosService } from '../../services/manzana.services.js';
-import { app, crearSesion, crearTerritorio, crearUsuario, enviarReporte, limpiarBase, prisma, puntoDe, type Territorio } from './ayudantes.js';
+import { app, crearSesion, crearTerritorio, crearUsuario, enviarReporte, limpiarBase, prisma, enManzana, type Territorio } from './ayudantes.js';
 
 let territorio: Territorio;
 const CLAVE = { 'x-clave-servicio': process.env.CLAVE_SERVICIO_INTERNO as string };
@@ -16,7 +16,7 @@ const manzanaLimpia = async (codigo: string, horasAtras: number) => {
     const sesion = await crearSesion();
     const epidemiologo = await crearUsuario('EPIDEMIOLOGO');
     const limpieza = await enviarReporte(sesion.token, {
-        ...puntoDe(codigo),
+        ...enManzana(codigo),
         tipo: 'LIMPIEZA',
         capturadoEn: new Date(Date.now() - horasAtras * 60 * 60 * 1000).toISOString(),
     });

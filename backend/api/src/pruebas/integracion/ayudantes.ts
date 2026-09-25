@@ -36,6 +36,8 @@ export interface Territorio {
     manzanas: Record<string, number>;
 }
 
+let territorioActual: Territorio | null = null;
+
 export const crearTerritorio = async (): Promise<Territorio> => {
     const localidades = {} as Record<NombreLocalidad, number>;
     const manzanas: Record<string, number> = {};
@@ -60,10 +62,19 @@ export const crearTerritorio = async (): Promise<Territorio> => {
         }
     }
 
-    return { localidades, manzanas };
+    territorioActual = { localidades, manzanas };
+    return territorioActual;
 };
 
-// Coordenadas del centro de una manzana de la grilla, por ejemplo puntoDe('capital-11').
+// Campo manzanaId de una manzana de la grilla del último territorio creado, por ejemplo enManzana('capital-11').
+// La PWA calcula la manzana en el celular: el reporte nunca lleva coordenadas.
+export const enManzana = (codigo: string) => {
+    const manzanaId = territorioActual?.manzanas[codigo];
+    if (!manzanaId) throw new Error(`No existe la manzana ${codigo}: falta crearTerritorio()`);
+    return { manzanaId };
+};
+
+// Centro de una manzana de la grilla (para intervenciones y rutas, que sí registra el personal).
 export const puntoDe = (codigo: string) => {
     const [clave, posicion] = codigo.split('-') as [NombreLocalidad, string];
     const origen = ORIGENES[clave];
@@ -115,11 +126,10 @@ export const imagenUnica = async (): Promise<Buffer> =>
 export interface CamposReporte {
     idCliente?: string;
     tipo?: TipoReporte;
-    latitud?: number;
-    longitud?: number;
+    manzanaId?: number;
     capturadoEn?: string;
     confianzaIa?: number;
-    reporteResueltoId?: string;
+    idClienteResuelto?: string;
 }
 
 export const enviarReporte = async (token: string, campos: CamposReporte, imagenes?: Buffer[]) => {

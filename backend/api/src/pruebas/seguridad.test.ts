@@ -9,6 +9,7 @@ const bd = vi.hoisted(() => ({
     sesionAnonima: { findUnique: vi.fn(), update: vi.fn() },
     reporte: { findUnique: vi.fn(), findMany: vi.fn() },
     evidencia: { findFirst: vi.fn() },
+    manzana: { findUnique: vi.fn() },
 }));
 
 vi.mock('../config/prisma.js', () => ({ default: bd }));
@@ -97,8 +98,7 @@ describe('recepción de evidencia', () => {
     const camposValidos = {
         idCliente: '0e6a5f4b-3d2c-4b1a-8f9e-7d6c5b4a3f2e',
         tipo: 'CRIADERO',
-        latitud: '-26.18',
-        longitud: '-58.17',
+        manzanaId: '12',
         capturadoEn: new Date().toISOString(),
     };
 
@@ -112,6 +112,7 @@ describe('recepción de evidencia', () => {
     beforeEach(() => {
         bd.sesionAnonima.findUnique.mockResolvedValue({ id: sesionId });
         bd.reporte.findUnique.mockResolvedValue(null);
+        bd.manzana.findUnique.mockResolvedValue({ id: 12 });
     });
 
     it('exige una sesión anónima', async () => {
@@ -119,10 +120,12 @@ describe('recepción de evidencia', () => {
         expect(respuesta.status).toBe(401);
     });
 
-    it('rechaza coordenadas fuera de la provincia', async () => {
-        const respuesta = await enviar({ ...camposValidos, latitud: '-34.60', longitud: '-58.38' });
+    it('exige la manzana: el reporte nunca lleva coordenadas', async () => {
+        const { manzanaId, ...sinManzana } = camposValidos;
+        const respuesta = await enviar({ ...sinManzana, latitud: '-26.18', longitud: '-58.17' });
+        expect(manzanaId).toBeDefined();
         expect(respuesta.status).toBe(400);
-        expect(respuesta.body.errors.map((error: { campo: string }) => error.campo)).toContain('latitud');
+        expect(respuesta.body.errors.map((error: { campo: string }) => error.campo)).toContain('manzanaId');
     });
 
     it('rechaza detecciones con estructura inválida', async () => {

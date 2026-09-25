@@ -105,10 +105,12 @@ paths:
         Es idempotente por `idCliente`: la PWA puede reintentarlo desde su cola de Background Sync.
         Responde 201 si lo crea y 200 con el mismo reporte si ya existía.
 
-        Las imágenes se verifican por su firma binaria y se re-codifican sin metadatos EXIF.
-        Todo reporte entra PENDIENTE: solo lo valida el personal institucional. `confianzaIa` se usa
-        únicamente para priorizar la revisión. Una LIMPIEZA con `reporteResueltoId` cierra ese criadero
-        recién cuando se valida.
+        Privacidad por diseño: el reporte lleva solo la **manzana** (la calcula el celular) y nunca
+        coordenadas; tampoco se guarda qué sesión lo envió. Las fotos llegan recortadas al objeto,
+        se re-codifican sin metadatos EXIF y se borran al decidir el reporte o a las 72 horas.
+
+        Todo reporte entra PENDIENTE: solo lo valida Epidemiología. `confianzaIa` se usa únicamente para
+        priorizar la revisión. Una LIMPIEZA con `idClienteResuelto` cierra ese criadero recién cuando se valida.
       tags: [Ciudadanía]
       security:
         - sesionAnonima: []
@@ -118,24 +120,25 @@ paths:
           multipart/form-data:
             schema:
               type: object
-              required: [idCliente, tipo, latitud, longitud, capturadoEn, imagenes]
+              required: [idCliente, tipo, manzanaId, capturadoEn, imagenes]
               properties:
                 idCliente: { type: string, format: uuid, description: UUID v4 generado por la PWA }
                 tipo: { $ref: '#/components/schemas/TipoReporte' }
                 origen: { $ref: '#/components/schemas/OrigenReporte' }
-                latitud: { type: number, minimum: -27.0, maximum: -21.9 }
-                longitud: { type: number, minimum: -62.4, maximum: -57.5 }
+                manzanaId:
+                  type: integer
+                  minimum: 1
+                  description: Manzana donde está el vecino. Los reportes fuera de las manzanas registradas se rechazan (422).
                 capturadoEn:
                   type: string
                   format: date-time
                   description: Hora del dispositivo; como máximo 30 días atrás y 5 minutos adelante.
-                precisionGpsM: { type: number, minimum: 0, maximum: 5000 }
                 confianzaIa: { type: number, minimum: 0, maximum: 1 }
                 descripcion: { type: string, maxLength: 500 }
-                reporteResueltoId:
+                idClienteResuelto:
                   type: string
                   format: uuid
-                  description: Solo para `LIMPIEZA`; criadero de la misma sesión que queda resuelto.
+                  description: Solo para `LIMPIEZA`. idCliente del criadero que se limpió; solo lo conoce el celular que lo reportó.
                 detecciones:
                   type: string
                   description: 'Lista JSON de hasta 50 elementos `{ clase, confianza, cajaDelimitadora: { x, y, ancho, alto } }`, todos entre 0 y 1.'
@@ -183,24 +186,39 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
         '429': { $ref: '#/components/responses/DemasiadasSolicitudes' }
 
-  /reportes/mios:
-    get:
-      operationId: listarMisReportes
-      summary: Reportes de la sesión (conciliación de la cola offline)
+  /reportes/consulta:
+    post:
+      operationId: consultarMisReportes
+      summary: Estado de los reportes propios (por idCliente)
+      description: |
+        El celular guarda los idCliente de lo que envió y pregunta por ellos. El servidor no guarda qué
+        sesión envió cada reporte, así que no puede listarlos "por persona". Es POST para que los
+        idCliente (que funcionan como llave) no queden en URLs ni registros. Los reportes descartados
+        por vencimiento no aparecen.
       tags: [Ciudadanía]
       security:
         - sesionAnonima: []
-      parameters:
-        - $ref: '#/components/parameters/Limite'
-        - $ref: '#/components/parameters/Cursor'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [idsCliente]
+              properties:
+                idsCliente:
+                  type: array
+                  minItems: 1
+                  maxItems: 100
+                  items: { type: string, format: uuid }
       responses:
         '200':
-          description: Página de reportes
+          description: Reportes encontrados
           content:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/ExitoPaginado'
+                  - $ref: '#/components/schemas/Exito'
                   - type: object
                     properties:
                       data:
@@ -261,6 +279,31 @@ paths:
                             nivelRiesgoBase: { type: string, enum: [CRITICO, ALTO, MODERADO_ALTO, MODERADO] }
                             latitud: { type: [number, 'null'] }
                             longitud: { type: [number, 'null'] }
+
+  /localidades/{id}/manzanas:
+    get:
+      operationId: listarManzanasDeLocalidad
+      summary: Todas las manzanas de una localidad (GeoJSON)
+      description: |
+        Público. El celular las guarda y calcula en qué manzana está sin enviar su ubicación:
+        el pedido solo revela la localidad. Coordenadas con 5 decimales. Cacheable 5 minutos.
+      tags: [Ciudadanía]
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/IdEntero'
+      responses:
+        '200':
+          description: FeatureCollection con el estado de cada manzana
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Exito'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/ColeccionGeoJson' }
+        '400': { $ref: '#/components/responses/SolicitudInvalida' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
 
   /suscripciones-push/clave-publica:
     get:
@@ -551,10 +594,11 @@ paths:
   /institucional/reportes/{id}:
     get:
       operationId: obtenerReporte
-      summary: Detalle de un reporte, con ubicación, detecciones y evidencias
+      summary: Detalle de un reporte, con su manzana, detecciones y fotos
       description: |
-        La ubicación es exacta para ADMINISTRADOR, COORDINADOR_BRIGADA y BRIGADISTA; para el resto se
-        redondea a 3 decimales (≈ 110 m). `ubicacion.exacta` indica cuál se recibió.
+        Sin ubicación exacta: solo la manzana. `evidencias` trae las fotos solo para quien tiene
+        `evidencias:ver` (Epidemiología) y solo mientras el reporte está PENDIENTE; para el resto es `[]`.
+        `venceEn` indica cuándo se descarta un pendiente que nadie revisó (72 horas desde que llegó).
       tags: [Reportes]
       security:
         - institucional: []
@@ -575,9 +619,9 @@ paths:
       operationId: cambiarEstadoReporte
       summary: Valida, rechaza o resuelve un reporte
       description: |
-        Permiso `reportes:validar`. Transiciones permitidas:
+        Permiso `reportes:validar` (solo Epidemiología). Transiciones permitidas:
         PENDIENTE → VALIDADO | RECHAZADO; VALIDADO → RESUELTO | RECHAZADO; RECHAZADO → VALIDADO.
-        Recalcula el color de la manzana.
+        Recalcula el color de la manzana y **borra las fotos** del reporte: ya no hacen falta.
       tags: [Reportes]
       security:
         - institucional: []
@@ -609,7 +653,7 @@ paths:
     get:
       operationId: obtenerImagenEvidencia
       summary: Descarga la foto de una evidencia
-      description: 'Permiso `evidencias:ver`, con alcance territorial. Cada descarga queda en la auditoría (`VER_EVIDENCIA`).'
+      description: 'Permiso `evidencias:ver` (solo Epidemiología). Solo mientras el reporte está PENDIENTE; una foto borrada responde 404. Cada descarga queda en la auditoría (`VER_EVIDENCIA`).'
       tags: [Evidencias]
       security:
         - institucional: []
@@ -937,8 +981,8 @@ paths:
       operationId: exportarReportes
       summary: Exporta reportes en CSV
       description: |
-        Permiso `exportaciones:descargar`. Queda auditada. Solo ADMINISTRADOR recibe coordenadas exactas;
-        el resto, redondeadas a 3 decimales (≈ 110 m). Nunca incluye datos de la sesión ciudadana.
+        Permiso `exportaciones:descargar`. Queda auditada. Los reportes de vecinos se exportan con su
+        localidad y manzana: no tienen coordenadas ni datos de sesión.
       tags: [Exportaciones]
       security:
         - institucional: []

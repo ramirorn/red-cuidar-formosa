@@ -228,3 +228,31 @@ export const listarManzanasService = async (recuadro: RecuadroMapa) => {
         })),
     };
 };
+
+// Todas las manzanas de una localidad, para que el celular calcule en cuál está sin decirle al
+// servidor su ubicación: el pedido solo revela la localidad. Coordenadas con 5 decimales (~1 m).
+const MANZANAS_MAXIMAS_POR_LOCALIDAD = 60_000;
+
+export const listarManzanasDeLocalidadService = async (localidadId: number) => {
+    const localidad = await prisma.localidad.findUnique({ where: { id: localidadId }, select: { id: true } });
+    if (!localidad) throw new ErrorHttp(404, 'Recurso no encontrado');
+
+    const filas = await prisma.$queryRaw<FilaManzanaMapa[]>`
+        SELECT m."id", m."codigo", m."estado", m."localidadId",
+               ST_AsGeoJSON(m."geom", 5)::json AS "geometria"
+        FROM "manzana" m
+        WHERE m."localidadId" = ${localidadId}
+        ORDER BY m."id"
+        LIMIT ${MANZANAS_MAXIMAS_POR_LOCALIDAD}
+    `;
+
+    return {
+        type: 'FeatureCollection',
+        features: filas.map((fila) => ({
+            type: 'Feature',
+            id: fila.id,
+            geometry: fila.geometria,
+            properties: { codigo: fila.codigo, estado: fila.estado, localidadId: fila.localidadId },
+        })),
+    };
+};

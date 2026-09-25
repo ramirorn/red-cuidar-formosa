@@ -8,7 +8,7 @@ import {
     enviarReporte,
     limpiarBase,
     prisma,
-    puntoDe,
+    enManzana,
     type Territorio,
 } from './ayudantes.js';
 
@@ -20,8 +20,8 @@ beforeEach(async () => {
     await limpiarBase();
     territorio = await crearTerritorio();
     const sesion = await crearSesion();
-    reporteCapital = (await enviarReporte(sesion.token, { ...puntoDe('capital-11'), confianzaIa: 0.3 })).body.data.id;
-    reporteClorinda = (await enviarReporte(sesion.token, { ...puntoDe('clorinda-11'), confianzaIa: 0.3 })).body.data.id;
+    reporteCapital = (await enviarReporte(sesion.token, { ...enManzana('capital-11'), confianzaIa: 0.3 })).body.data.id;
+    reporteClorinda = (await enviarReporte(sesion.token, { ...enManzana('clorinda-11'), confianzaIa: 0.3 })).body.data.id;
 });
 
 const conToken = (token: string) => ({ Authorization: `Bearer ${token}` });
@@ -44,73 +44,73 @@ describe('alcance territorial con datos reales', () => {
         expect(respuesta.body.data).toHaveLength(2);
     });
 
-    it('el detalle, la foto y el cambio de estado de otra localidad responden 404', async () => {
+    it('el detalle de otra localidad responde 404', async () => {
         const coordinador = await crearUsuario('COORDINADOR_BRIGADA', territorio.localidades.clorinda);
-        const evidencia = await prisma.evidencia.findFirstOrThrow({ where: { reporteId: reporteCapital } });
 
         const detalle = await request(app).get(`/api/institucional/reportes/${reporteCapital}`).set(conToken(coordinador.token));
-        const foto = await request(app).get(`/api/institucional/evidencias/${evidencia.id}/imagen`).set(conToken(coordinador.token));
-        const cambio = await request(app)
-            .patch(`/api/institucional/reportes/${reporteCapital}/estado`)
-            .set(conToken(coordinador.token))
-            .send({ estado: 'VALIDADO' });
 
-        expect([detalle.status, foto.status, cambio.status]).toEqual([404, 404, 404]);
-        expect((await prisma.reporte.findUniqueOrThrow({ where: { id: reporteCapital } })).estado).toBe('PENDIENTE');
+        expect(detalle.status).toBe(404);
     });
+});
 
-    it('la foto se descarga como JPEG para quien tiene alcance', async () => {
-        const coordinador = await crearUsuario('COORDINADOR_BRIGADA', territorio.localidades.capital);
+describe('privacidad: solo Epidemiología ve fotos y valida', () => {
+    it('la foto se descarga como JPEG para Epidemiología y queda en la auditoría', async () => {
+        const epidemiologo = await crearUsuario('EPIDEMIOLOGO');
         const evidencia = await prisma.evidencia.findFirstOrThrow({ where: { reporteId: reporteCapital } });
 
-        const foto = await request(app).get(`/api/institucional/evidencias/${evidencia.id}/imagen`).set(conToken(coordinador.token));
+        const foto = await request(app).get(`/api/institucional/evidencias/${evidencia.id}/imagen`).set(conToken(epidemiologo.token));
 
         expect(foto.status).toBe(200);
         expect(foto.headers['content-type']).toContain('image/jpeg');
         expect(foto.body.subarray(0, 2).toString('hex')).toBe('ffd8');
-    });
-
-    it('la ubicación es exacta para el coordinador y redondeada para el epidemiólogo', async () => {
-        const coordinador = await crearUsuario('COORDINADOR_BRIGADA', territorio.localidades.capital);
-        const epidemiologo = await crearUsuario('EPIDEMIOLOGO');
-        const decimales = (numero: number) => String(numero).split('.')[1]?.length ?? 0;
-
-        const paraCoordinador = await request(app).get(`/api/institucional/reportes/${reporteCapital}`).set(conToken(coordinador.token));
-        const paraEpidemiologo = await request(app).get(`/api/institucional/reportes/${reporteCapital}`).set(conToken(epidemiologo.token));
-
-        expect(paraCoordinador.body.data.ubicacion.exacta).toBe(true);
-        expect(decimales(paraCoordinador.body.data.ubicacion.latitud)).toBeGreaterThan(3);
-        expect(paraEpidemiologo.body.data.ubicacion.exacta).toBe(false);
-        expect(decimales(paraEpidemiologo.body.data.ubicacion.latitud)).toBeLessThanOrEqual(3);
-    });
-
-    it('ver una foto queda registrado en la auditoría', async () => {
-        const coordinador = await crearUsuario('COORDINADOR_BRIGADA', territorio.localidades.capital);
-        const evidencia = await prisma.evidencia.findFirstOrThrow({ where: { reporteId: reporteCapital } });
-
-        await request(app).get(`/api/institucional/evidencias/${evidencia.id}/imagen`).set(conToken(coordinador.token)).expect(200);
-
         const registro = await prisma.auditoriaAcceso.findFirstOrThrow({ where: { accion: 'VER_EVIDENCIA' } });
-        expect(registro).toMatchObject({ usuarioId: coordinador.id, recurso: `evidencia:${evidencia.id}` });
+        expect(registro).toMatchObject({ usuarioId: epidemiologo.id, recurso: `evidencia:${evidencia.id}` });
     });
 
-    it('un auditor no puede ver fotos aunque tenga alcance provincial', async () => {
-        const auditor = await crearUsuario('AUDITOR');
+    it('ni la administración, ni la coordinación, ni las brigadas, ni la auditoría ven fotos ni validan', async () => {
         const evidencia = await prisma.evidencia.findFirstOrThrow({ where: { reporteId: reporteCapital } });
+        const usuarios = [
+            await crearUsuario('ADMINISTRADOR'),
+            await crearUsuario('COORDINADOR_BRIGADA', territorio.localidades.capital),
+            await crearUsuario('BRIGADISTA', territorio.localidades.capital),
+            await crearUsuario('AUDITOR'),
+        ];
 
-        const foto = await request(app).get(`/api/institucional/evidencias/${evidencia.id}/imagen`).set(conToken(auditor.token));
+        for (const usuario of usuarios) {
+            const foto = await request(app).get(`/api/institucional/evidencias/${evidencia.id}/imagen`).set(conToken(usuario.token));
+            const detalle = await request(app).get(`/api/institucional/reportes/${reporteCapital}`).set(conToken(usuario.token));
+            const cambio = await request(app)
+                .patch(`/api/institucional/reportes/${reporteCapital}/estado`)
+                .set(conToken(usuario.token))
+                .send({ estado: 'VALIDADO' });
 
-        expect(foto.status).toBe(403);
+            expect(foto.status).toBe(403);
+            expect(cambio.status).toBe(403);
+            // El detalle sí lo ven, pero sin fotos ni ubicación.
+            expect(detalle.body.data.evidencias).toEqual([]);
+            expect(detalle.body.data).not.toHaveProperty('ubicacion');
+        }
+        expect((await prisma.reporte.findUniqueOrThrow({ where: { id: reporteCapital } })).estado).toBe('PENDIENTE');
+    });
+
+    it('el detalle informa cuándo vence un reporte pendiente', async () => {
+        const epidemiologo = await crearUsuario('EPIDEMIOLOGO');
+
+        const detalle = await request(app).get(`/api/institucional/reportes/${reporteCapital}`).set(conToken(epidemiologo.token));
+
+        const creado = new Date(detalle.body.data.createdAt).getTime();
+        expect(new Date(detalle.body.data.venceEn).getTime() - creado).toBe(72 * 3600_000);
+        expect(detalle.body.data.evidencias).toHaveLength(1);
     });
 });
 
 describe('cambios de estado', () => {
     it('validar un reporte pendiente recalcula la manzana y deja historial con el usuario', async () => {
-        const coordinador = await crearUsuario('COORDINADOR_BRIGADA', territorio.localidades.capital);
+        const epidemiologo = await crearUsuario('EPIDEMIOLOGO');
 
         const respuesta = await request(app)
             .patch(`/api/institucional/reportes/${reporteCapital}/estado`)
-            .set(conToken(coordinador.token))
+            .set(conToken(epidemiologo.token))
             .send({ estado: 'VALIDADO' });
 
         expect(respuesta.status).toBe(200);
@@ -120,11 +120,11 @@ describe('cambios de estado', () => {
             where: { manzanaId: manzana.id },
             orderBy: { id: 'desc' },
         });
-        expect(ultimoCambio).toMatchObject({ estadoAnterior: 'AMARILLO', estadoNuevo: 'ROJO', usuarioId: coordinador.id });
+        expect(ultimoCambio).toMatchObject({ estadoAnterior: 'AMARILLO', estadoNuevo: 'ROJO', usuarioId: epidemiologo.id });
     });
 
-    it('dos funcionarios que validan a la vez: uno gana y el otro recibe 409', async () => {
-        const primero = await crearUsuario('COORDINADOR_BRIGADA', territorio.localidades.capital);
+    it('dos personas que validan a la vez: una gana y la otra recibe 409', async () => {
+        const primero = await crearUsuario('EPIDEMIOLOGO');
         const segundo = await crearUsuario('EPIDEMIOLOGO');
 
         const respuestas = await Promise.all([primero, segundo].map((usuario) =>

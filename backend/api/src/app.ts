@@ -2,6 +2,7 @@ import express, { type NextFunction, type Request, type Response } from "express
 import cors from "cors";
 import helmet from "helmet";
 import cookieParser from "cookie-parser";
+import compression from "compression";
 import { fileURLToPath } from "node:url";
 import entorno, { esProduccion } from "./config/entorno.js";
 import prisma from "./config/prisma.js";
@@ -9,6 +10,7 @@ import { limiteGeneral } from "./middlewares/limiteTasa.middleware.js";
 
 // Rutas
 import router from "./routes/index.js";
+import { iniciarTareasProgramadas } from "./tareas/privacidad.tareas.js";
 
 const app = express();
 
@@ -16,6 +18,8 @@ app.disable("x-powered-by");
 app.set("trust proxy", entorno.CONFIAR_PROXY);
 
 app.use(helmet());
+// El mapa de manzanas de una localidad es un JSON grande: comprimido pesa ~5 veces menos.
+app.use(compression());
 app.use(cors({ origin: entorno.CORS_ORIGENES, credentials: true }));
 app.use(limiteGeneral);
 app.use(express.json({ limit: "100kb" }));
@@ -63,6 +67,7 @@ if (process.env.NODE_ENV !== "test") {
     app.listen(entorno.PORT, () => {
         console.log(`Servidor corriendo en: http://localhost:${entorno.PORT}`);
     });
+    iniciarTareasProgramadas();
 }
 
 export default app;

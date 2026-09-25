@@ -105,8 +105,25 @@ Cada servicio se conecta con su propio rol (privilegio mínimo, ver `db/init` y 
 | SIN_DATOS | La manzana nunca tuvo reportes ni intervenciones. |
 
 Todo reporte ciudadano entra PENDIENTE (la manzana pasa a AMARILLO, "revisar") y **solo lo valida una persona**
-con permiso `reportes:validar`. La confianza de la IA la informa el dispositivo, así que únicamente ordena la bandeja
-de revisión (`orden=prioridad`). Una limpieza que indica `reporteResueltoId` cierra ese criadero recién cuando se valida.
+de Epidemiología (`reportes:validar`). La confianza de la IA la informa el dispositivo, así que únicamente ordena la bandeja
+de revisión (`orden=prioridad`). Una limpieza que indica `idClienteResuelto` cierra ese criadero recién cuando se valida.
+
+## Privacidad por diseño
+
+El vecino es anónimo y lo que envía no permite ubicar su casa ni reconstruir su historial:
+
+- **Solo la manzana.** El celular descarga las manzanas de su localidad (`GET /api/localidades/:id/manzanas`),
+  calcula en cuál está y envía solo ese `manzanaId`. La base no tiene columnas de ubicación exacta ni de precisión
+  del GPS. Los reportes fuera de las manzanas registradas no se admiten.
+- **Sin vínculo entre reportes.** El reporte no guarda la sesión que lo envió. "Mis reportes" funciona porque el
+  celular guarda sus `idCliente` (UUID aleatorio que solo él conoce) y pregunta por ellos (`POST /api/reportes/consulta`).
+- **Fotos mínimas.** El celular recorta la foto al objeto (el recuadro de la IA o el que marca el vecino) y la
+  re-codifica sin metadatos EXIF; el servidor vuelve a re-codificarla por las dudas.
+- **Fotos efímeras.** Solo Epidemiología las ve, solo para decidir, y cada vista queda auditada. Se borran al validar
+  o rechazar el reporte. A las 48 h el panel avisa que un pendiente está por vencer; a las 72 h sin revisar se
+  descartan la foto y el reporte. Queda el hash de la foto para impedir reutilizarla.
+- **Tarea periódica.** La API corre cada 15 minutos el descarte de vencidos y borra del disco los archivos sin registro
+  (`src/tareas/privacidad.tareas.ts`).
 n8n dispara `POST /api/interno/manzanas/recalcular` después de cada lluvia y una vez por día.
 
 ### Índice de riesgo y predicción (motor predictivo)
@@ -126,13 +143,13 @@ Si alguien pide un recurso de otra localidad, recibe 404, así no puede confirma
 | Permiso | ADMINISTRADOR | EPIDEMIOLOGO | COORDINADOR_BRIGADA | BRIGADISTA | AUDITOR |
 |---|:-:|:-:|:-:|:-:|:-:|
 | Leer reportes | ✔ | ✔ | ✔ | ✔ | ✔ |
-| Validar / rechazar / resolver reportes | ✔ | ✔ | ✔ | | |
-| Ver fotos de evidencia | ✔ | ✔ | ✔ | ✔ | |
+| Validar / rechazar / resolver reportes | | ✔ | | | |
+| Ver fotos de evidencia (solo pendientes) | | ✔ | | | |
 | Registrar intervenciones | ✔ | | ✔ | ✔ | |
 | Leer intervenciones | ✔ | ✔ | ✔ | ✔ | ✔ |
 | Métricas epidemiológicas | ✔ | ✔ | ✔ | | ✔ |
 | Mapa de calor | ✔ | ✔ | ✔ | ✔ | ✔ |
-| Exportar CSV | ✔ (coordenadas exactas) | ✔ (≈ 110 m) | ✔ (≈ 110 m) | | |
+| Exportar CSV | ✔ | ✔ | ✔ | | |
 | Ver rutas de brigada | ✔ | ✔ | ✔ | ✔ (solo las asignadas) | ✔ |
 | Generar rutas | ✔ | | ✔ | | |
 | Ejecutar rutas (iniciar, marcar paradas) | ✔ | | ✔ | ✔ (no puede cancelar) | |
@@ -140,15 +157,15 @@ Si alguien pide un recurso de otra localidad, recibe 404, así no puede confirma
 | Leer auditoría | ✔ | | | | ✔ |
 | **Alcance** | Provincia | Provincia | Su localidad | Su localidad | Provincia |
 
-- **ADMINISTRADOR:** gestión de cuentas y acceso total.
-- **EPIDEMIOLOGO:** análisis provincial y validación técnica de reportes; no opera en el campo.
-- **COORDINADOR_BRIGADA:** conduce el operativo de su localidad; valida reportes, registra intervenciones y exporta sus datos.
-- **BRIGADISTA:** trabaja en el campo; ve reportes y fotos de su localidad y registra lo que hizo.
-- **AUDITOR:** control externo de solo lectura; ve métricas y auditoría, pero no las fotos de los domicilios.
+- **ADMINISTRADOR:** gestión de cuentas y del sistema. No ve fotos ni valida: no siempre conoce el tema.
+- **EPIDEMIOLOGO:** el único que ve las fotos y valida los reportes (es el experto); análisis provincial.
+- **COORDINADOR_BRIGADA:** conduce el operativo de su localidad; arma rutas, registra intervenciones y exporta sus datos.
+- **BRIGADISTA:** trabaja en el campo; ve los reportes (sin fotos) de su localidad y registra lo que hizo.
+- **AUDITOR:** control externo de solo lectura; ve métricas y auditoría.
 
-La ubicación de un reporte (casi siempre la casa de un vecino) es exacta solo para ADMINISTRADOR,
-COORDINADOR_BRIGADA y BRIGADISTA, que tienen que ir al lugar; EPIDEMIOLOGO y AUDITOR la ven redondeada (≈ 110 m).
-Cada vista de una foto de evidencia queda registrada en la auditoría (`VER_EVIDENCIA`).
+Los reportes no tienen ubicación exacta: las brigadas van a la manzana. Las intervenciones sí guardan el punto
+que registra el personal; se exporta exacto solo para ADMINISTRADOR y redondeado (≈ 110 m) para el resto.
+Cada vista de una foto queda registrada en la auditoría (`VER_EVIDENCIA`).
 
 Rol, localidad y estado activo se leen de la base en cada petición: una baja o un cambio de rol
 tiene efecto inmediato, aunque el token de acceso todavía no haya vencido.
@@ -168,8 +185,9 @@ cercano desde el punto de partida. Una intervención registrada con `paradaRutaI
 | Método | Ruta | Descripción |
 |---|---|---|
 | POST | `/api/sesiones` | Crea una sesión anónima y devuelve su token. |
-| POST | `/api/reportes` | Multipart: `imagenes` (1 a 3 JPEG/PNG/WebP, ≤ 5 MB), `idCliente` (UUID de la PWA), `tipo`, `latitud`, `longitud`, `capturadoEn`, `confianzaIa?`, `precisionGpsM?`, `descripcion?`, `detecciones?` (JSON), `reporteResueltoId?`. Es idempotente por `idCliente`: responde 201 si lo crea y 200 si ya existía. |
-| GET | `/api/reportes/mios` | Reportes de la sesión, para conciliar la cola de Background Sync. |
+| POST | `/api/reportes` | Multipart: `imagenes` (1 a 3 recortes JPEG/PNG/WebP, ≤ 5 MB), `idCliente` (UUID de la PWA), `tipo`, `manzanaId`, `capturadoEn`, `confianzaIa?`, `descripcion?`, `detecciones?` (JSON), `idClienteResuelto?`. Es idempotente por `idCliente`: responde 201 si lo crea y 200 si ya existía. |
+| POST | `/api/reportes/consulta` | Estado de los reportes propios, por la lista de `idCliente` que guarda el celular. |
+| GET | `/api/localidades/:id/manzanas` | Todas las manzanas de una localidad, para calcular la manzana en el celular. |
 | GET | `/api/manzanas?longitudMinima&latitudMinima&longitudMaxima&latitudMaxima` | GeoJSON público del mapa comunitario (recuadro ≤ 0,1°). |
 | POST / DELETE | `/api/suscripciones-push` | Alta y baja de la suscripción Web Push. |
 

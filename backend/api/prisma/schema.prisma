@@ -175,7 +175,6 @@ model sesionAnonima {
   id                String   @id @default(uuid()) @db.Uuid
   ultimaActividadEn DateTime @default(now())
 
-  reportes      reporte[]
   suscripciones suscripcionPush[]
   triajes       triajeChat[]
 
@@ -184,30 +183,28 @@ model sesionAnonima {
   @@index([ultimaActividadEn])
 }
 
+// Privacidad por diseño: el reporte no guarda ubicación exacta ni la sesión que lo envió.
+// Solo la manzana (calculada en el celular) y un idCliente aleatorio que únicamente conoce ese celular.
 model reporte {
-  id                String                                @id @default(uuid()) @db.Uuid
-  // Identificador generado por la PWA: hace idempotentes los reintentos del Background Sync.
-  idCliente         String                                @db.Uuid
-  sesionId          String?                               @db.Uuid
-  manzanaId         Int?
+  id                String        @id @default(uuid()) @db.Uuid
+  // Generado por la PWA: hace idempotentes los reintentos y le permite al vecino consultar su reporte.
+  idCliente         String        @unique @db.Uuid
+  manzanaId         Int
   tipo              TipoReporte
-  origen            OrigenReporte                         @default(PWA)
-  estado            EstadoReporte                         @default(PENDIENTE)
-  ubicacion         Unsupported("geography(Point, 4326)")
-  precisionGpsM     Float?
+  origen            OrigenReporte @default(PWA)
+  estado            EstadoReporte @default(PENDIENTE)
   confianzaIa       Float?
-  descripcion       String?                               @db.VarChar(500)
-  reporteResueltoId String?                               @db.Uuid
+  descripcion       String?       @db.VarChar(500)
+  reporteResueltoId String?       @db.Uuid
   capturadoEn       DateTime
   validadoPorId     Int?
   validadoEn        DateTime?
-  motivoRechazo     String?                               @db.VarChar(300)
+  motivoRechazo     String?       @db.VarChar(300)
 
-  sesion           sesionAnonima? @relation(fields: [sesionId], references: [id], onDelete: SetNull)
-  manzana          manzana?       @relation(fields: [manzanaId], references: [id])
-  reporteResuelto  reporte?       @relation("ReporteResuelto", fields: [reporteResueltoId], references: [id], onDelete: SetNull)
-  reportesDeCierre reporte[]      @relation("ReporteResuelto")
-  validadoPor      usuario?       @relation(fields: [validadoPorId], references: [id])
+  manzana          manzana   @relation(fields: [manzanaId], references: [id])
+  reporteResuelto  reporte?  @relation("ReporteResuelto", fields: [reporteResueltoId], references: [id], onDelete: SetNull)
+  reportesDeCierre reporte[] @relation("ReporteResuelto")
+  validadoPor      usuario?  @relation(fields: [validadoPorId], references: [id])
   detecciones      deteccionIa[]
   evidencias       evidencia[]
   intervenciones   intervencion[]
@@ -215,11 +212,9 @@ model reporte {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([sesionId, idCliente])
   @@index([manzanaId, capturadoEn])
   @@index([estado, createdAt])
   @@index([createdAt, id])
-  @@index([ubicacion], type: Gist)
 }
 
 model deteccionIa {
@@ -235,17 +230,20 @@ model deteccionIa {
   @@index([reporteId])
 }
 
+// La foto (ya recortada en el celular) solo existe mientras el reporte espera validación:
+// se borra al validarlo o rechazarlo, y como máximo a las 72 horas. Queda el hash para
+// impedir que la misma foto se reutilice en otro reporte.
 model evidencia {
   id                 String           @id @default(uuid()) @db.Uuid
   reporteId          String           @db.Uuid
-  rutaAlmacenamiento String           @unique
+  rutaAlmacenamiento String?          @unique
   mime               String           @db.VarChar(50)
   tamanoBytes        Int
-  // Hash del archivo original: impide reutilizar la misma foto en otro reporte.
   sha256             String           @unique @db.Char(64)
   ancho              Int
   alto               Int
   momento            MomentoEvidencia
+  borradaEn          DateTime?
 
   reporte reporte @relation(fields: [reporteId], references: [id], onDelete: Cascade)
 

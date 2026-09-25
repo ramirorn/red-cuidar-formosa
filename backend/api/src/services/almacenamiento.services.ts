@@ -79,7 +79,8 @@ const recodificar = async (original: Buffer): Promise<ImagenProcesada> => {
     }
 };
 
-const directorioBase = (): string => path.resolve(entorno.DIR_EVIDENCIAS);
+export const directorioEvidencias = (): string => path.resolve(entorno.DIR_EVIDENCIAS);
+const directorioBase = directorioEvidencias;
 
 // El nombre del archivo lo genera el servidor: el nombre original del cliente nunca se usa.
 export const guardarImagenService = async (contenido: Buffer): Promise<string> => {

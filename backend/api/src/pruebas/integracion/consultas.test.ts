@@ -24,15 +24,15 @@ const FECHA_COMUN = new Date(Date.now() - 60 * 60 * 1000);
 const insertarReportes = async (localidadId: number, cantidad: number, fecha: Date | null) => {
     await prisma.$executeRaw`
         WITH manzanas AS (
-            SELECT "id", "geom", row_number() OVER (ORDER BY "id") - 1 AS orden, COUNT(*) OVER () AS total
+            SELECT "id", row_number() OVER (ORDER BY "id") - 1 AS orden, COUNT(*) OVER () AS total
             FROM "manzana" WHERE "localidadId" = ${localidadId}
         ),
         nuevos AS (
-            INSERT INTO "reporte" ("id", "idCliente", "manzanaId", "tipo", "estado", "ubicacion", "capturadoEn", "createdAt", "updatedAt")
+            INSERT INTO "reporte" ("id", "idCliente", "manzanaId", "tipo", "estado", "capturadoEn", "createdAt", "updatedAt")
             SELECT gen_random_uuid(), gen_random_uuid(), m."id",
                    (CASE WHEN g % 3 = 0 THEN 'MICROBASURAL' ELSE 'CRIADERO' END)::"TipoReporte",
                    (CASE WHEN g % 2 = 0 THEN 'VALIDADO' ELSE 'PENDIENTE' END)::"EstadoReporte",
-                   ST_PointOnSurface(m."geom")::geography, now(),
+                   now(),
                    COALESCE(${fecha}::timestamp, now() - make_interval(secs => g)), now()
             FROM generate_series(1, ${cantidad}) AS g
             JOIN manzanas m ON m.orden = g % m.total
@@ -123,36 +123,23 @@ describe('exportación CSV', () => {
 
         expect(respuesta.status).toBe(200);
         const [encabezado, ...filas] = filasCsv(respuesta.body as string);
-        expect(encabezado).toContain('latitud');
+        // Los reportes de vecinos no tienen coordenadas: solo la manzana.
+        expect(encabezado).toContain('manzana');
+        expect(encabezado).not.toContain('latitud');
         expect(filas).toHaveLength(CANTIDAD_CAPITAL);
         expect(new Set(filas.map((fila) => fila.split(',')[0])).size).toBe(CANTIDAD_CAPITAL);
     });
 
-    it('redondea las coordenadas para el coordinador y las deja exactas para el administrador', async () => {
-        const exportar = (token: string) => request(app)
+    it('cada exportación queda en la auditoría', async () => {
+        const auditadasAntes = await prisma.auditoriaAcceso.count({ where: { accion: 'EXPORTAR_CSV' } });
+
+        await request(app)
             .get('/api/institucional/exportaciones/reportes')
             .query({ localidadId: territorio.localidades.clorinda })
-            .set('Authorization', `Bearer ${token}`)
-            .buffer(true)
-            .parse((res, callback) => {
-                let texto = '';
-                res.on('data', (parte: Buffer) => { texto += parte.toString('utf8'); });
-                res.on('end', () => callback(null, texto));
-            });
+            .set('Authorization', `Bearer ${coordinador.token}`)
+            .expect(200);
 
-        const decimales = (texto: string) => {
-            const [, fila] = filasCsv(texto);
-            const latitud = fila!.split(',').at(-2)!;
-            return latitud.split('.')[1]?.length ?? 0;
-        };
-
-        const auditadasAntes = await prisma.auditoriaAcceso.count({ where: { accion: 'EXPORTAR_CSV' } });
-        const delCoordinador = await exportar(coordinador.token);
-        const delAdministrador = await exportar(administrador.token);
-
-        expect(decimales(delCoordinador.body as string)).toBeLessThanOrEqual(3);
-        expect(decimales(delAdministrador.body as string)).toBeGreaterThan(3);
-        expect(await prisma.auditoriaAcceso.count({ where: { accion: 'EXPORTAR_CSV' } })).toBe(auditadasAntes + 2);
+        expect(await prisma.auditoriaAcceso.count({ where: { accion: 'EXPORTAR_CSV' } })).toBe(auditadasAntes + 1);
     });
 
     it('un coordinador no puede exportar otra localidad', async () => {

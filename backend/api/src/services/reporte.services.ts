@@ -1,6 +1,6 @@
 import { Prisma, type ClaseObjeto, type EstadoReporte, type OrigenReporte, type TipoReporte } from '@prisma/client';
 import prisma from '../config/prisma.js';
-import { esRolProvincial, ROLES_COORDENADAS_EXACTAS, ROLES_UBICACION_EXACTA_EN_DETALLE } from '../config/permisos.js';
+import { esRolProvincial, PERMISOS, tienePermiso } from '../config/permisos.js';
 import type { UsuarioAutenticado } from '../middlewares/autenticacion.middleware.js';
 import { alcanceLocalidad, verificarAlcance } from '../utils/alcance.js';
 import { ErrorHttp } from '../utils/errorHttp.js';
@@ -12,6 +12,7 @@ import {
     procesarImagenService,
     type ImagenProcesada,
 } from './almacenamiento.services.js';
+import { borrarFotosDeReportesService, venceEn } from './evidencia.services.js';
 import { recalcularEstadoManzanaService } from './manzana.services.js';
 import { invalidarCacheMapaCalorService } from './mapaCalor.services.js';
 import { registrarActividadSesionService } from './sesion.services.js';
@@ -31,13 +32,11 @@ export interface DatosReporte {
     idCliente: string;
     tipo: TipoReporte;
     origen?: OrigenReporte;
-    latitud: number;
-    longitud: number;
+    manzanaId: number;
     capturadoEn: Date;
-    precisionGpsM?: number;
     confianzaIa?: number;
     descripcion?: string;
-    reporteResueltoId?: string;
+    idClienteResuelto?: string;
     detecciones: DeteccionEntrada[];
 }
 
@@ -51,8 +50,8 @@ const seleccionResumen = {
     manzana: { select: { id: true, codigo: true, estado: true } },
 } satisfies Prisma.reporteSelect;
 
-const buscarPorIdCliente = (sesionId: string, idCliente: string) => prisma.reporte.findUnique({
-    where: { sesionId_idCliente: { sesionId, idCliente } },
+const buscarPorIdCliente = (idCliente: string) => prisma.reporte.findUnique({
+    where: { idCliente },
     select: seleccionResumen,
 });
 
@@ -60,30 +59,37 @@ const buscarPorIdCliente = (sesionId: string, idCliente: string) => prisma.repor
 // Ciudadanía: recepción de evidencia y sincronización
 // ---------------------------------------------------------------------------
 
-// Idempotente por (sesión, idCliente): la PWA puede reintentar el envío desde su cola
-// de Background Sync cuantas veces quiera y el reporte se crea una única vez.
+// Idempotente por idCliente: la PWA puede reintentar el envío desde su cola de Background Sync
+// cuantas veces quiera y el reporte se crea una única vez.
+// Privacidad: la sesión solo autentica el envío (y limita la tasa); no se guarda en el reporte.
 export const crearReporteService = async (sesionId: string, datos: DatosReporte, archivos: Express.Multer.File[]) => {
-    const existente = await buscarPorIdCliente(sesionId, datos.idCliente);
+    const existente = await buscarPorIdCliente(datos.idCliente);
     if (existente) return { reporte: existente, creado: false };
 
     if (archivos.length === 0) {
         throw new ErrorHttp(400, 'Debe adjuntar al menos una imagen como evidencia');
     }
 
-    // El criadero a cerrar debe ser de la misma sesión; se cierra recién cuando una persona valide la limpieza.
-    if (datos.reporteResueltoId) {
+    // Los reportes fuera de las manzanas registradas no se admiten.
+    const manzana = await prisma.manzana.findUnique({ where: { id: datos.manzanaId }, select: { id: true } });
+    if (!manzana) throw new ErrorHttp(422, 'La ubicación no corresponde a ninguna manzana registrada');
+
+    // El criadero a cerrar se identifica con su idCliente (solo lo conoce quien lo reportó).
+    // Se cierra recién cuando una persona valide la limpieza.
+    let reporteResueltoId: string | null = null;
+    if (datos.idClienteResuelto) {
         const reporteAResolver = await prisma.reporte.findFirst({
             where: {
-                id: datos.reporteResueltoId,
-                sesionId,
+                idCliente: datos.idClienteResuelto,
                 tipo: { in: TIPOS_PELIGRO },
                 estado: { in: ['PENDIENTE', 'VALIDADO'] },
             },
-            select: { id: true, manzanaId: true },
+            select: { id: true },
         });
         if (!reporteAResolver) {
             throw new ErrorHttp(422, 'El reporte que se intenta resolver no existe o no admite cierre');
         }
+        reporteResueltoId = reporteAResolver.id;
     }
 
     const imagenes: ImagenProcesada[] = [];
@@ -97,7 +103,7 @@ export const crearReporteService = async (sesionId: string, datos: DatosReporte,
     }
     const imagenReutilizada = await prisma.evidencia.findFirst({ where: { sha256: { in: hashes } }, select: { id: true } });
     if (imagenReutilizada) {
-        return resolverConflictoDeImagen(sesionId, datos.idCliente);
+        return resolverConflictoDeImagen(datos.idCliente);
     }
 
     const rutas: string[] = [];
@@ -106,83 +112,51 @@ export const crearReporteService = async (sesionId: string, datos: DatosReporte,
             rutas.push(await guardarImagenService(imagen.contenido));
         }
 
-        const estado: EstadoReporte = 'PENDIENTE';
         const momento = datos.tipo === 'LIMPIEZA' ? 'DESPUES' : 'ANTES';
 
         const resultado = await prisma.$transaction(async (tx) => {
-            // ON CONFLICT cubre la carrera entre dos reintentos simultáneos del mismo reporte.
-            const [insertado] = await tx.$queryRaw<{ id: string; manzanaId: number | null }[]>`
-                INSERT INTO "reporte" (
-                    "id", "idCliente", "sesionId", "manzanaId", "tipo", "origen", "estado", "ubicacion",
-                    "precisionGpsM", "confianzaIa", "descripcion", "reporteResueltoId", "capturadoEn", "updatedAt"
-                )
-                VALUES (
-                    gen_random_uuid(), ${datos.idCliente}::uuid, ${sesionId}::uuid,
-                    (
-                        SELECT m."id" FROM "manzana" m
-                        WHERE ST_Contains(m."geom", ST_SetSRID(ST_MakePoint(${datos.longitud}::float8, ${datos.latitud}::float8), 4326))
-                        LIMIT 1
-                    ),
-                    ${datos.tipo}::"TipoReporte", ${datos.origen ?? 'PWA'}::"OrigenReporte", ${estado}::"EstadoReporte",
-                    ST_SetSRID(ST_MakePoint(${datos.longitud}::float8, ${datos.latitud}::float8), 4326)::geography,
-                    ${datos.precisionGpsM ?? null}::float8, ${datos.confianzaIa ?? null}::float8,
-                    ${datos.descripcion ?? null}, ${datos.reporteResueltoId ?? null}::uuid,
-                    ${datos.capturadoEn}, now()
-                )
-                ON CONFLICT ("sesionId", "idCliente") DO NOTHING
-                RETURNING "id", "manzanaId"
-            `;
-
-            if (!insertado) return null;
-
-            await tx.evidencia.createMany({
-                data: imagenes.map((imagen, indice) => ({
-                    reporteId: insertado.id,
-                    rutaAlmacenamiento: rutas[indice] as string,
-                    mime: imagen.mime,
-                    tamanoBytes: imagen.tamanoBytes,
-                    sha256: imagen.sha256,
-                    ancho: imagen.ancho,
-                    alto: imagen.alto,
-                    momento,
-                })),
+            const creado = await tx.reporte.create({
+                data: {
+                    idCliente: datos.idCliente,
+                    manzanaId: datos.manzanaId,
+                    tipo: datos.tipo,
+                    origen: datos.origen ?? 'PWA',
+                    estado: 'PENDIENTE',
+                    confianzaIa: datos.confianzaIa ?? null,
+                    descripcion: datos.descripcion ?? null,
+                    reporteResueltoId,
+                    capturadoEn: datos.capturadoEn,
+                    evidencias: {
+                        create: imagenes.map((imagen, indice) => ({
+                            rutaAlmacenamiento: rutas[indice] as string,
+                            mime: imagen.mime,
+                            tamanoBytes: imagen.tamanoBytes,
+                            sha256: imagen.sha256,
+                            ancho: imagen.ancho,
+                            alto: imagen.alto,
+                            momento,
+                        })),
+                    },
+                    detecciones: {
+                        create: datos.detecciones.map((deteccion) => ({
+                            clase: deteccion.clase,
+                            confianza: deteccion.confianza,
+                            cajaDelimitadora: deteccion.cajaDelimitadora,
+                        })),
+                    },
+                },
+                select: { id: true },
             });
 
-            if (datos.detecciones.length > 0) {
-                await tx.deteccionIa.createMany({
-                    data: datos.detecciones.map((deteccion) => ({
-                        reporteId: insertado.id,
-                        clase: deteccion.clase,
-                        confianza: deteccion.confianza,
-                        cajaDelimitadora: deteccion.cajaDelimitadora,
-                    })),
-                });
-            }
-
             // Un reporte pendiente no pinta de rojo ni de verde: a lo sumo deja la manzana en AMARILLO ("revisar").
-            let huboCambioDeEstado = false;
-            if (insertado.manzanaId !== null) {
-                await tx.manzana.update({
-                    where: { id: insertado.manzanaId },
-                    data: { ultimoReporteEn: new Date() },
-                });
-                const { cambio } = await recalcularEstadoManzanaService(tx, insertado.manzanaId, {
-                    motivo: `Reporte ciudadano de ${datos.tipo.toLowerCase()}`,
-                    reporteId: insertado.id,
-                });
-                huboCambioDeEstado = cambio;
-            }
+            await tx.manzana.update({ where: { id: datos.manzanaId }, data: { ultimoReporteEn: new Date() } });
+            const { cambio } = await recalcularEstadoManzanaService(tx, datos.manzanaId, {
+                motivo: `Reporte ciudadano de ${datos.tipo.toLowerCase()}`,
+                reporteId: creado.id,
+            });
 
-            return { id: insertado.id, huboCambioDeEstado };
+            return { id: creado.id, huboCambioDeEstado: cambio };
         });
-
-        if (!resultado) {
-            // Otro reintento ganó la carrera: se descartan los archivos de este intento.
-            await eliminarImagenesService(rutas);
-            const reporte = await buscarPorIdCliente(sesionId, datos.idCliente);
-            if (!reporte) throw new ErrorHttp(409, 'El reporte está siendo procesado');
-            return { reporte, creado: false };
-        }
 
         await registrarActividadSesionService(sesionId);
         if (resultado.huboCambioDeEstado) await invalidarCacheMapaCalorService();
@@ -191,8 +165,9 @@ export const crearReporteService = async (sesionId: string, datos: DatosReporte,
         return { reporte, creado: true };
     } catch (error) {
         await eliminarImagenesService(rutas);
+        // P2002: otro reintento simultáneo del mismo reporte (idCliente) o una foto ya usada (sha256).
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-            return resolverConflictoDeImagen(sesionId, datos.idCliente);
+            return resolverConflictoDeImagen(datos.idCliente);
         }
         throw error;
     }
@@ -200,24 +175,20 @@ export const crearReporteService = async (sesionId: string, datos: DatosReporte,
 
 // Una foto repetida puede venir de otro reporte (se rechaza) o de un reintento simultáneo del
 // mismo reporte que se guardó un instante antes (se responde como reintento exitoso).
-const resolverConflictoDeImagen = async (sesionId: string, idCliente: string) => {
-    const mismoReporte = await buscarPorIdCliente(sesionId, idCliente);
+const resolverConflictoDeImagen = async (idCliente: string) => {
+    const mismoReporte = await buscarPorIdCliente(idCliente);
     if (mismoReporte) return { reporte: mismoReporte, creado: false };
     throw new ErrorHttp(409, 'Una de las imágenes ya fue enviada en otro reporte');
 };
 
-// Permite a la PWA conciliar su cola local con lo que el servidor ya recibió.
-export const listarMisReportesService = async (sesionId: string, limite: number, cursor?: string) => {
-    const reportes = await prisma.reporte.findMany({
-        where: { sesionId },
-        select: seleccionResumen,
-        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-        take: limite + 1,
-        ...(cursor ? { cursor: { id: decodificarCursor(cursor) }, skip: 1 } : {}),
-    });
-
-    return armarPagina(reportes, limite);
-};
+// "Mis reportes": el celular guarda los idCliente de lo que envió y pregunta por ellos.
+// Sin sesión en el reporte, el servidor no puede saber qué reportes son de la misma persona.
+// Los descartados por vencimiento simplemente no aparecen.
+export const consultarMisReportesService = async (idsCliente: string[]) => prisma.reporte.findMany({
+    where: { idCliente: { in: idsCliente } },
+    select: seleccionResumen,
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+});
 
 // ---------------------------------------------------------------------------
 // Dashboard institucional
@@ -284,7 +255,6 @@ export const obtenerReporteService = async (usuario: UsuarioAutenticado, id: str
             tipo: true,
             origen: true,
             estado: true,
-            precisionGpsM: true,
             confianzaIa: true,
             descripcion: true,
             capturadoEn: true,
@@ -295,22 +265,24 @@ export const obtenerReporteService = async (usuario: UsuarioAutenticado, id: str
             validadoPor: { select: { id: true, nombre: true, apellido: true } },
             manzana: { select: { id: true, codigo: true, estado: true, localidadId: true } },
             detecciones: { select: { clase: true, confianza: true, cajaDelimitadora: true } },
-            evidencias: { select: { id: true, momento: true, ancho: true, alto: true, createdAt: true } },
+            evidencias: {
+                where: { rutaAlmacenamiento: { not: null } },
+                select: { id: true, momento: true, ancho: true, alto: true, createdAt: true },
+            },
         },
     });
 
     if (!reporte) throw new ErrorHttp(404, 'Recurso no encontrado');
-    verificarAlcance(usuario, reporte.manzana?.localidadId);
+    verificarAlcance(usuario, reporte.manzana.localidadId);
 
-    const exacta = ROLES_UBICACION_EXACTA_EN_DETALLE.includes(usuario.rol);
-    const decimales = exacta ? 6 : 3;
-    const [ubicacion] = await prisma.$queryRaw<{ latitud: number; longitud: number }[]>`
-        SELECT ROUND(ST_Y("ubicacion"::geometry)::numeric, ${decimales}::int)::float8 AS "latitud",
-               ROUND(ST_X("ubicacion"::geometry)::numeric, ${decimales}::int)::float8 AS "longitud"
-        FROM "reporte" WHERE "id" = ${id}::uuid
-    `;
+    // Las fotos solo existen mientras el reporte espera validación, y solo las ve Epidemiología.
+    const puedeVerFotos = tienePermiso(usuario.rol, PERMISOS.EVIDENCIAS_VER) && reporte.estado === 'PENDIENTE';
 
-    return { ...reporte, ubicacion: ubicacion ? { ...ubicacion, exacta } : null };
+    return {
+        ...reporte,
+        evidencias: puedeVerFotos ? reporte.evidencias : [],
+        venceEn: reporte.estado === 'PENDIENTE' ? venceEn(reporte.createdAt) : null,
+    };
 };
 
 // Transiciones permitidas del ciclo de vida de un reporte.
@@ -344,7 +316,7 @@ export const cambiarEstadoReporteService = async (
         });
 
         if (!reporte) throw new ErrorHttp(404, 'Recurso no encontrado');
-        verificarAlcance(usuario, reporte.manzana?.localidadId);
+        verificarAlcance(usuario, reporte.manzana.localidadId);
 
         if (!esTransicionValida(reporte.estado, nuevoEstado, reporte.tipo)) {
             throw new ErrorHttp(409, `No se puede pasar un reporte de ${reporte.estado} a ${nuevoEstado}`);
@@ -363,18 +335,22 @@ export const cambiarEstadoReporteService = async (
         if (count === 0) throw new ErrorHttp(409, 'El reporte fue modificado por otro usuario; recargue e intente nuevamente');
 
         const manzanasAfectadas = new Set<number>();
-        if (reporte.manzanaId !== null) manzanasAfectadas.add(reporte.manzanaId);
+        manzanasAfectadas.add(reporte.manzanaId);
 
         // Validar una limpieza cierra el criadero que el vecino indicó, si sigue abierto y está en el alcance
         // de quien valida. La condición sobre el estado evita reabrir un criadero rechazado mientras tanto.
         const criadero = reporte.reporteResuelto;
+        const reportesDecididos = [id];
         if (nuevoEstado === 'VALIDADO' && reporte.tipo === 'LIMPIEZA' && criadero
-            && (esRolProvincial(usuario.rol) || criadero.manzana?.localidadId === usuario.localidadId)) {
+            && (esRolProvincial(usuario.rol) || criadero.manzana.localidadId === usuario.localidadId)) {
             const cierre = await tx.reporte.updateMany({
                 where: { id: criadero.id, estado: { in: ['PENDIENTE', 'VALIDADO'] } },
                 data: { estado: 'RESUELTO', validadoPorId: usuario.id, validadoEn: new Date() },
             });
-            if (cierre.count > 0 && criadero.manzanaId !== null) manzanasAfectadas.add(criadero.manzanaId);
+            if (cierre.count > 0) {
+                manzanasAfectadas.add(criadero.manzanaId);
+                reportesDecididos.push(criadero.id);
+            }
         }
 
         // Se bloquean las manzanas siempre en el mismo orden para evitar interbloqueos entre transacciones.
@@ -388,9 +364,11 @@ export const cambiarEstadoReporteService = async (
             cambioManzana ||= cambio;
         }
 
-        return { id, estado: nuevoEstado, cambioManzana };
+        return { id, estado: nuevoEstado, cambioManzana, reportesDecididos };
     });
 
+    // Decidido el reporte, su foto ya no hace falta: se borra (también la del criadero que se cerró).
+    await borrarFotosDeReportesService(resultado.reportesDecididos);
     if (resultado.cambioManzana) await invalidarCacheMapaCalorService();
     return { id: resultado.id, estado: resultado.estado };
 };
@@ -409,27 +387,23 @@ interface FilaExportacionReporte {
     estado: EstadoReporte;
     origen: string;
     confianzaIa: number | null;
-    localidad: string | null;
-    manzana: string | null;
-    latitud: number;
-    longitud: number;
+    localidad: string;
+    manzana: string;
 }
 
 export const COLUMNAS_EXPORTACION_REPORTES = [
     'id', 'recibido_en', 'capturado_en', 'tipo', 'estado', 'origen',
-    'confianza_ia', 'localidad', 'manzana', 'latitud', 'longitud',
+    'confianza_ia', 'localidad', 'manzana',
 ];
 
 // Recorre los reportes por lotes con paginación keyset para no cargar todo en memoria.
-// Nunca exporta el identificador de la sesión ciudadana y redondea la ubicación
-// (3 decimales ≈ 110 m) salvo para los roles con acceso a coordenadas exactas.
+// Los reportes de vecinos no tienen ubicación exacta ni sesión: se exporta solo la manzana.
 export async function* generarExportacionReportesService(
     usuario: UsuarioAutenticado,
     filtros: { localidadId?: number; desde?: Date; hasta?: Date },
 ): AsyncGenerator<unknown[]> {
     const localidadId = alcanceLocalidad(usuario, filtros.localidadId);
     const { desde, hasta } = resolverRango(filtros.desde, filtros.hasta);
-    const decimales = ROLES_COORDENADAS_EXACTAS.includes(usuario.rol) ? 6 : 3;
     const filtroLocalidad = localidadId === null ? Prisma.empty : Prisma.sql`AND m."localidadId" = ${localidadId}`;
 
     let ultimo: { createdAt: Date; id: string } | null = null;
@@ -441,12 +415,10 @@ export async function* generarExportacionReportesService(
 
         const filas: FilaExportacionReporte[] = await prisma.$queryRaw<FilaExportacionReporte[]>`
             SELECT r."id", r."createdAt", r."capturadoEn", r."tipo", r."estado", r."origen", r."confianzaIa",
-                   l."nombre" AS "localidad", m."codigo" AS "manzana",
-                   ROUND(ST_Y(r."ubicacion"::geometry)::numeric, ${decimales}::int)::float8 AS "latitud",
-                   ROUND(ST_X(r."ubicacion"::geometry)::numeric, ${decimales}::int)::float8 AS "longitud"
+                   l."nombre" AS "localidad", m."codigo" AS "manzana"
             FROM "reporte" r
-            LEFT JOIN "manzana" m ON m."id" = r."manzanaId"
-            LEFT JOIN "localidad" l ON l."id" = m."localidadId"
+            JOIN "manzana" m ON m."id" = r."manzanaId"
+            JOIN "localidad" l ON l."id" = m."localidadId"
             WHERE r."createdAt" BETWEEN ${desde} AND ${hasta}
             ${filtroLocalidad}
             ${desdeUltimo}
@@ -457,7 +429,7 @@ export async function* generarExportacionReportesService(
         for (const fila of filas) {
             yield [
                 fila.id, fila.createdAt, fila.capturadoEn, fila.tipo, fila.estado, fila.origen,
-                fila.confianzaIa, fila.localidad, fila.manzana, fila.latitud, fila.longitud,
+                fila.confianzaIa, fila.localidad, fila.manzana,
             ];
         }
 

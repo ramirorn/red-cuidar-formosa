@@ -1,6 +1,6 @@
 import { body, query } from 'express-validator';
 import { ClaseObjeto, EstadoReporte, OrigenReporte, TipoReporte } from '@prisma/client';
-import { validarIdUuid, validarLatitud, validarLocalidadConsulta, validarLongitud, validarPaginacion, validarRangoFechas } from './comun.validators.js';
+import { validarIdUuid, validarLocalidadConsulta, validarPaginacion, validarRangoFechas } from './comun.validators.js';
 
 const MAXIMO_DETECCIONES = 50;
 const TOLERANCIA_RELOJ_MS = 5 * 60 * 1000;
@@ -45,8 +45,8 @@ export const validarCrearReporte = [
     body('idCliente').isUUID(4).withMessage('idCliente debe ser un UUID v4 generado por la PWA'),
     body('tipo').isIn(Object.values(TipoReporte)).withMessage('tipo inválido'),
     body('origen').optional().isIn(Object.values(OrigenReporte)).withMessage('origen debe ser PWA o CHAT'),
-    validarLatitud('latitud'),
-    validarLongitud('longitud'),
+    // Solo la manzana: el celular calcula en cuál está y nunca envía la ubicación exacta.
+    body('manzanaId').isInt({ min: 1 }).withMessage('manzanaId es obligatorio').toInt(),
     body('capturadoEn')
         .isISO8601({ strict: true }).withMessage('capturadoEn debe ser una fecha ISO 8601')
         .toDate()
@@ -56,12 +56,13 @@ export const validarCrearReporte = [
             if (diferencia > ANTIGUEDAD_MAXIMA_MS) throw new Error('capturadoEn no puede tener más de 30 días');
             return true;
         }),
-    body('precisionGpsM').optional().isFloat({ min: 0, max: 5000 }).withMessage('precisionGpsM inválida').toFloat(),
     body('confianzaIa').optional().isFloat({ min: 0, max: 1 }).withMessage('confianzaIa debe estar entre 0 y 1').toFloat(),
     body('descripcion').optional().isString().trim().isLength({ max: 500 }).withMessage('descripcion admite hasta 500 caracteres'),
-    body('reporteResueltoId')
+    // El criadero que se limpió se indica con su idCliente: solo lo conoce el celular que lo reportó,
+    // así se prueba que es propio sin guardar qué sesión envió cada reporte.
+    body('idClienteResuelto')
         .optional()
-        .isUUID(4).withMessage('reporteResueltoId inválido')
+        .isUUID(4).withMessage('idClienteResuelto inválido')
         .custom((_valor, { req }) => {
             if (req.body.tipo !== 'LIMPIEZA') throw new Error('Solo un reporte de LIMPIEZA puede resolver otro reporte');
             return true;
@@ -82,7 +83,13 @@ export const validarCrearReporte = [
         }),
 ];
 
-export const validarListarMisReportes = [...validarPaginacion];
+const MAXIMO_CONSULTA_PROPIOS = 100;
+
+export const validarConsultarMisReportes = [
+    body('idsCliente')
+        .isArray({ min: 1, max: MAXIMO_CONSULTA_PROPIOS }).withMessage(`idsCliente debe ser una lista de 1 a ${MAXIMO_CONSULTA_PROPIOS} identificadores`),
+    body('idsCliente.*').isUUID(4).withMessage('Cada idCliente debe ser un UUID v4'),
+];
 
 export const validarListarReportes = [
     ...validarPaginacion,
