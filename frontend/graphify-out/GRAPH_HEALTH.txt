@@ -1,0 +1,40 @@
+[graphify] MultiDiGraph edge-collapse diagnostic
+input: <in-memory>
+input_stage: provided JSON (normal graph.json is post-build)
+effective_directed: <direct-call>
+nodes: 767
+unverified_code_nodes: 0
+raw_edges: 2270
+valid_candidate_edges: 2256
+missing_endpoint_edges: 0
+dangling_endpoint_edges: 14
+self_loop_edges: 0
+exact_duplicate_edges: 0
+directed_unique_endpoint_pairs: 2244
+directed_same_endpoint_collapsed_edges: 12
+undirected_unique_endpoint_pairs: 2244
+undirected_same_endpoint_collapsed_edges: 12
+same_endpoint_group_count: 12
+relation_variant_groups: 8
+source_file_variant_groups: 0
+source_location_variant_groups: 4
+context_variant_groups: 0
+post_build_graph_type: Graph
+post_build_edges: 2244
+producer_suppression_sites: 12
+producer_suppression_examples:
+  - L1337 seen_ids arity=unknown
+  - L1870 seen_ids arity=unknown
+  - L1872 seen_doc_refs arity=unknown
+  - L2242 seen_ids arity=unknown
+  - L2389 seen_ids arity=unknown
+  - L3027 seen_keys arity=unknown
+  - L3196 seen_keys arity=unknown
+  - L4900 seen_ids arity=unknown
+examples:
+  - src_api_cliente -> src_api_cliente_clientevecino edges=2 relations=['calls', 'contains'] locations=['L21', 'L7'] contexts=['', 'call']
+  - src_api_panel_api -> src_tipos_index edges=2 relations=['imports_from'] locations=['L26', 'L3'] contexts=['import']
+  - src_api_panel_api -> src_api_panel_api_clientepanel edges=2 relations=['calls', 'contains'] locations=['L30', 'L48'] contexts=['', 'call']
+  - src_autenticacion_tokenpanel_refrescartoken -> src_autenticacion_tokenpanel_pedirrefresco edges=2 relations=['calls', 'indirect_call'] locations=['L43', 'L44'] contexts=['argument', 'call']
+  - src_componentes_ui_chipestado -> src_tipos_index edges=2 relations=['imports_from', 're_exports'] locations=['L3', 'L5'] contexts=['export', 'import']
+note: normal graph.json is post-build; raw producer loss must be measured earlier.

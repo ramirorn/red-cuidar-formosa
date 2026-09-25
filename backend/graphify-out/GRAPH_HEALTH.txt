@@ -1,0 +1,40 @@
+[graphify] MultiDiGraph edge-collapse diagnostic
+input: <in-memory>
+input_stage: provided JSON (normal graph.json is post-build)
+effective_directed: <direct-call>
+nodes: 749
+unverified_code_nodes: 0
+raw_edges: 1945
+valid_candidate_edges: 1891
+missing_endpoint_edges: 0
+dangling_endpoint_edges: 54
+self_loop_edges: 2
+exact_duplicate_edges: 0
+directed_unique_endpoint_pairs: 1813
+directed_same_endpoint_collapsed_edges: 78
+undirected_unique_endpoint_pairs: 1813
+undirected_same_endpoint_collapsed_edges: 78
+same_endpoint_group_count: 77
+relation_variant_groups: 74
+source_file_variant_groups: 0
+source_location_variant_groups: 2
+context_variant_groups: 1
+post_build_graph_type: Graph
+post_build_edges: 1813
+producer_suppression_sites: 12
+producer_suppression_examples:
+  - L1337 seen_ids arity=unknown
+  - L1870 seen_ids arity=unknown
+  - L1872 seen_doc_refs arity=unknown
+  - L2242 seen_ids arity=unknown
+  - L2389 seen_ids arity=unknown
+  - L3027 seen_keys arity=unknown
+  - L3196 seen_keys arity=unknown
+  - L4900 seen_ids arity=unknown
+examples:
+  - motor_predictivo_pruebas_test_mapa_calor_factores -> motor_predictivo_app_services_mapa_calor_services_factoresriesgo edges=3 relations=['calls', 'references', 'uses'] locations=['L15', 'L18'] contexts=['', 'call', 'return_type']
+  - api_prisma_migrations_20260924120000_esquema_inicial_migration_rutabrigada -> api_prisma_migrations_20260924120000_esquema_inicial_migration_usuario edges=2 relations=['references'] locations=['L442', 'L445'] contexts=['']
+  - api_src_controllers_exportacion_controllers -> api_src_middlewares_autenticacion_middleware edges=2 relations=['imports_from'] locations=['L12', 'L5'] contexts=['import']
+  - api_src_controllers_exportacion_controllers -> api_src_services_intervencion_services_generarexportacionintervencionesservice edges=2 relations=['imports', 'indirect_call'] locations=['L7', 'L75'] contexts=['argument', 'import']
+  - api_src_controllers_exportacion_controllers -> api_src_services_reporte_services_generarexportacionreportesservice edges=2 relations=['imports', 'indirect_call'] locations=['L11', 'L70'] contexts=['argument', 'import']
+note: normal graph.json is post-build; raw producer loss must be measured earlier.
