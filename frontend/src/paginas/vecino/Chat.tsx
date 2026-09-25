@@ -39,7 +39,7 @@ export default function Chat() {
     };
 
     return (
-        <div className="flex h-[calc(100dvh-8.5rem)] flex-col">
+        <div className="flex h-[calc(100dvh-8.5rem)] flex-col lg:h-[calc(100dvh-5rem)]">
             <div className="flex items-center gap-3 border-b border-gris-borde bg-white px-4 py-3">
                 <img src="/marca/icono-192.png" alt="" width="44" height="44" className="size-11 rounded-2xl border border-gris-borde" />
                 <div className="flex-1">
@@ -99,7 +99,7 @@ export default function Chat() {
             </div>
 
             {mensajes.length === 0 && (
-                <div className="-mb-1 flex gap-2 overflow-x-auto px-4 pb-2">
+                <div className="-mb-1 flex gap-2 overflow-x-auto px-4 pb-2 lg:flex-wrap lg:overflow-visible">
                     {SUGERENCIAS.map((sugerencia) => (
                         <button key={sugerencia} type="button" onClick={() => mandar(sugerencia)} disabled={!enLinea}
                             className="shrink-0 rounded-full border border-verde-300 bg-white px-3 py-2 text-sm font-bold text-verde-800 disabled:opacity-50">

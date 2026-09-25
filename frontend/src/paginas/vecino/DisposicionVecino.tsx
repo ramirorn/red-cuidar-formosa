@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Link, NavLink, Outlet, useMatches, useNavigate } from 'react-router';
-import { ArrowLeft, CloudUpload, House, ListChecks, Map, MessageCircleHeart, Wifi, WifiOff } from 'lucide-react';
+import { ArrowLeft, BellRing, Camera, CloudUpload, House, Lightbulb, ListChecks, Map, MessageCircleHeart, Wifi, WifiOff } from 'lucide-react';
+import { BotonEnlace } from '@/componentes/ui/Boton';
 import { useColaReportes } from '@/hooks/useColaReportes';
 import { useEnLinea } from '@/hooks/useEnLinea';
 import { useVolver } from '@/hooks/useVolver';
@@ -11,6 +12,13 @@ const NAVEGACION = [
     { a: '/app/mapa', texto: 'Mapa', Icono: Map },
     { a: '/app/reportes', texto: 'Reportes', Icono: ListChecks },
     { a: '/app/chat', texto: 'Chat', Icono: MessageCircleHeart },
+];
+
+// En la computadora hay lugar para todas las secciones en la barra superior.
+const NAVEGACION_ESCRITORIO = [
+    ...NAVEGACION,
+    { a: '/app/alertas', texto: 'Alertas', Icono: BellRing },
+    { a: '/app/consejos', texto: 'Consejos', Icono: Lightbulb },
 ];
 
 const IndicadorConexion = () => {
@@ -43,10 +51,13 @@ const IndicadorConexion = () => {
 };
 
 // Estructura de la PWA: barra superior compacta y navegación inferior al alcance del pulgar.
-export interface DatosSubpantalla {
-    titulo: string;
-    volverA: string;
+export interface DatosPantalla {
+    // Pantallas secundarias (no están en la barra inferior): destino de "volver".
+    volverA?: string;
     directo?: boolean;
+    titulo?: string;
+    // Ancho en la computadora: "amplio" (inicio), "completo" (mapa) o angosto por defecto (lectura).
+    ancho?: 'amplio' | 'completo';
 }
 
 // Botón de la barra superior: vuelve a la pantalla anterior o, si se entró directo, al respaldo.
@@ -62,55 +73,79 @@ const BotonAtras = ({ respaldo, directo }: { respaldo: string; directo: boolean 
 };
 
 export default function DisposicionVecino() {
-    // Las pantallas que no están en la barra inferior declaran título y destino de "volver" en el router.
-    const subpantalla = useMatches().map((coincidencia) => coincidencia.handle as DatosSubpantalla | undefined).findLast(Boolean);
+    const datos = useMatches().map((coincidencia) => coincidencia.handle as DatosPantalla | undefined).filter(Boolean) as DatosPantalla[];
+    const subpantalla = datos.findLast((dato) => dato.volverA);
+    const ancho = datos.findLast((dato) => dato.ancho)?.ancho;
+
     return (
         <div className="flex min-h-dvh flex-col bg-crema">
-                <header className="sticky top-0 z-30 border-b border-gris-borde/70 bg-white/95 pt-[env(safe-area-inset-top)] backdrop-blur">
-                    <div className="mx-auto flex h-14 max-w-2xl items-center justify-between px-4">
-                        {subpantalla ? (
-                            <div className="flex min-w-0 items-center gap-1">
-                                <BotonAtras respaldo={subpantalla.volverA} directo={subpantalla.directo ?? false} />
-                                <p className="truncate text-lg font-black">{subpantalla.titulo}</p>
-                            </div>
-                        ) : (
-                            <Link to="/app" aria-label="Red-Cuidar Formosa, inicio">
-                                <img src="/marca/logo-horizontal.webp" alt="Red-Cuidar Formosa" width="529" height="234" className="h-10 w-auto" />
-                            </Link>
-                        )}
+            <header className="sticky top-0 z-30 border-b border-gris-borde/70 bg-white/95 pt-[env(safe-area-inset-top)] backdrop-blur">
+                <div className="mx-auto flex h-14 max-w-2xl items-center justify-between gap-3 px-4 lg:h-16 lg:max-w-6xl lg:px-8">
+                    <div className="flex min-w-0 items-center gap-1">
+                        {subpantalla?.volverA && <BotonAtras respaldo={subpantalla.volverA} directo={subpantalla.directo ?? false} />}
+                        {/* El logo siempre lleva al inicio de la app. */}
+                        <Link to="/app" aria-label="Red-Cuidar Formosa, ir al inicio" className="shrink-0">
+                            <img src="/marca/logo-horizontal.webp" alt="Red-Cuidar Formosa" width="529" height="234" className="h-10 w-auto lg:h-11" />
+                        </Link>
+                    </div>
+
+                    <nav aria-label="Secciones de la app" className="hidden lg:block">
+                        <ul className="flex items-center gap-1">
+                            {NAVEGACION_ESCRITORIO.map(({ a, texto, Icono, fin }) => (
+                                <li key={a}>
+                                    <NavLink to={a} end={fin} className={({ isActive }) => cn(
+                                        'flex items-center gap-2 rounded-full px-3.5 py-2 text-sm font-extrabold transition',
+                                        isActive ? 'bg-verde-100 text-verde-800' : 'text-tinta-suave hover:bg-gris-superficie hover:text-tinta',
+                                    )}>
+                                        <Icono className="size-4" strokeWidth={2.4} aria-hidden />{texto}
+                                    </NavLink>
+                                </li>
+                            ))}
+                        </ul>
+                    </nav>
+
+                    <div className="flex items-center gap-2">
+                        <BotonEnlace to="/app/escanear?nuevo=1" tamano="chico" className="hidden lg:inline-flex" icono={<Camera className="size-4" aria-hidden />}>Escanear</BotonEnlace>
                         <IndicadorConexion />
                     </div>
-                </header>
+                </div>
+            </header>
 
-                <main className="mx-auto w-full max-w-2xl flex-1 pb-28">
-                    <Outlet />
-                </main>
+            <main className={cn(
+                'mx-auto w-full max-w-2xl flex-1 pb-28 lg:pb-12',
+                ancho === 'amplio' && 'lg:max-w-6xl lg:px-4',
+                ancho === 'completo' && 'lg:max-w-none lg:pb-0',
+                !ancho && 'lg:max-w-3xl lg:pt-4',
+            )}>
+                <Outlet />
+            </main>
 
-                <nav aria-label="Secciones de la app" className="fixed inset-x-0 bottom-0 z-30 border-t border-gris-borde bg-white pb-[env(safe-area-inset-bottom)]">
-                    <ul className="mx-auto grid max-w-2xl grid-cols-4">
-                        {NAVEGACION.map(({ a, texto, Icono, fin }) => (
-                            <li key={a}>
-                                <NavLink
-                                    to={a}
-                                    end={fin}
-                                    className={({ isActive }) => cn(
-                                        'flex flex-col items-center gap-1 py-2.5 text-xs font-extrabold',
-                                        isActive ? 'text-verde-600' : 'text-gris-texto hover:text-tinta',
-                                    )}
-                                >
-                                    {({ isActive }) => (
-                                        <>
-                                            <span className={cn('grid h-8 w-14 place-items-center rounded-full transition', isActive && 'bg-verde-100')}>
-                                                <Icono className="size-5" strokeWidth={2.4} aria-hidden />
-                                            </span>
-                                            {texto}
-                                        </>
-                                    )}
-                                </NavLink>
-                            </li>
-                        ))}
-                    </ul>
-                </nav>
+            {/* Celular: navegación inferior al alcance del pulgar. En la computadora va arriba. */}
+            <nav aria-label="Secciones de la app" className="fixed inset-x-0 bottom-0 z-30 border-t border-gris-borde bg-white pb-[env(safe-area-inset-bottom)] lg:hidden">
+                <ul className="mx-auto grid max-w-2xl grid-cols-4">
+                    {NAVEGACION.map(({ a, texto, Icono, fin }) => (
+                        <li key={a}>
+                            <NavLink
+                                to={a}
+                                end={fin}
+                                className={({ isActive }) => cn(
+                                    'flex flex-col items-center gap-1 py-2.5 text-xs font-extrabold',
+                                    isActive ? 'text-verde-600' : 'text-gris-texto hover:text-tinta',
+                                )}
+                            >
+                                {({ isActive }) => (
+                                    <>
+                                        <span className={cn('grid h-8 w-14 place-items-center rounded-full transition', isActive && 'bg-verde-100')}>
+                                            <Icono className="size-5" strokeWidth={2.4} aria-hidden />
+                                        </span>
+                                        {texto}
+                                    </>
+                                )}
+                            </NavLink>
+                        </li>
+                    ))}
+                </ul>
+            </nav>
         </div>
     );
 }

@@ -52,7 +52,7 @@ export default function MapaBarrio() {
     const conDatos = manzanas.filter((manzana) => manzana.properties.estado !== 'SIN_DATOS').length;
 
     return (
-        <div className="relative h-[calc(100dvh-8.5rem)]">
+        <div className="relative h-[calc(100dvh-8.5rem)] lg:h-[calc(100dvh-4rem)]">
             <MapaManzanas
                 key={`${centro[0]},${centro[1]}`}
                 centro={centro}

@@ -27,7 +27,7 @@ export const PiePublico = () => (
     <footer className="bg-verde-950 text-white">
         <div className="mx-auto grid max-w-7xl gap-10 px-6 py-14 md:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1.2fr_auto]">
             <div>
-                <img src="/marca/logo-blanco.png" alt="Red-Cuidar Formosa" width="529" height="234" loading="lazy" className="h-16 w-auto" />
+                <Link to="/" aria-label="Red-Cuidar Formosa, ir al inicio" className="inline-block"><img src="/marca/logo-blanco.png" alt="Red-Cuidar Formosa" width="529" height="234" loading="lazy" className="h-16 w-auto" /></Link>
                 <p className="mt-4 max-w-xs text-sm leading-relaxed text-white/75">
                     Una red de vecinos y equipos de salud que detecta criaderos de mosquitos y los elimina, manzana por manzana.
                 </p>

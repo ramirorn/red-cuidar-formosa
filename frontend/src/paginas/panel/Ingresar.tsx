@@ -53,7 +53,7 @@ export default function Ingresar() {
     return (
         <div className="grid min-h-dvh bg-crema lg:grid-cols-[1.05fr_1fr]">
             <section className="relative hidden overflow-hidden bg-verde-700 p-12 text-white lg:flex lg:flex-col lg:justify-between">
-                <img src="/marca/logo-blanco.png" alt="Red-Cuidar Formosa" width="529" height="234" className="h-14 w-auto self-start" />
+                <Link to="/" aria-label="Red-Cuidar Formosa, ir al inicio" className="self-start"><img src="/marca/logo-blanco.png" alt="Red-Cuidar Formosa" width="529" height="234" className="h-14 w-auto" /></Link>
                 <div className="relative z-10 max-w-md">
                     <Rotulo tono="blanco">Panel institucional</Rotulo>
                     <h1 className="mt-3 text-4xl leading-tight font-black">
@@ -71,7 +71,7 @@ export default function Ingresar() {
 
             <main className="flex items-center justify-center px-5 py-12">
                 <div className="w-full max-w-sm">
-                    <img src="/marca/logo-horizontal.webp" alt="Red-Cuidar Formosa" width="529" height="234" className="mb-10 h-12 w-auto lg:hidden" />
+                    <Link to="/" aria-label="Red-Cuidar Formosa, ir al inicio" className="mb-10 inline-block lg:hidden"><img src="/marca/logo-horizontal.webp" alt="Red-Cuidar Formosa" width="529" height="234" className="h-12 w-auto" /></Link>
                     <span className="grid size-12 place-items-center rounded-2xl bg-verde-100 text-verde-700"><LockKeyhole className="size-6" aria-hidden /></span>
                     <h2 className="mt-5 text-3xl font-black">Ingresar</h2>
                     <Subrayado className="w-20 text-verde-500" />

@@ -155,8 +155,10 @@ export default function Escaner() {
     const lleno = borrador.fotos.length >= MAXIMO_FOTOS;
 
     return (
-        <div className="fixed inset-0 z-50 flex flex-col bg-tinta text-white">
-            <div className="relative flex-1 overflow-hidden">
+        // Celular: pantalla completa. Computadora: ventana centrada (la cámara web no llena la pantalla).
+        <div className="fixed inset-0 z-50 flex flex-col bg-tinta text-white lg:items-center lg:justify-center lg:bg-tinta/95 lg:p-8">
+            <div className="flex flex-1 flex-col lg:w-full lg:max-w-4xl lg:flex-none lg:overflow-hidden lg:rounded-panel lg:border lg:border-white/10 lg:shadow-elevada">
+            <div className="relative flex-1 overflow-hidden lg:aspect-video lg:flex-none">
                 <video ref={video} className="absolute inset-0 size-full object-cover" playsInline muted aria-label="Vista de la cámara" />
                 {estadoCamara === 'activa' && <Recuadros detecciones={detecciones} ancho={dimensiones.ancho} alto={dimensiones.alto} />}
 
@@ -202,7 +204,7 @@ export default function Escaner() {
                 <div className="mt-4 grid grid-cols-3 items-center">
                     <label className={cn('flex cursor-pointer flex-col items-center gap-1 text-xs font-bold text-white/85', lleno && 'pointer-events-none opacity-40')}>
                         <span className="grid size-12 place-items-center rounded-full bg-white/15"><ImagePlus aria-hidden /></span>
-                        Galería
+                        <span className="lg:hidden">Galería</span><span className="hidden lg:inline">Subir foto</span>
                         <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={desdeGaleria} disabled={lleno || procesando} />
                     </label>
                     <button
@@ -221,6 +223,10 @@ export default function Escaner() {
                         </button>
                     ) : <span />}
                 </div>
+                <p className="mt-4 hidden text-center text-xs text-white/60 lg:block">
+                    ¿Estás en la computadora? Es más fácil tocar <strong className="text-white/85">Subir foto</strong> y elegir una que sacaste con el celular.
+                </p>
+            </div>
             </div>
         </div>
     );

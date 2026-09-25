@@ -50,7 +50,7 @@ const Bienvenida = ({ alTerminar }: { alTerminar: () => void }) => {
     const ultima = actual === DIAPOSITIVAS.length - 1;
 
     return (
-        <div className="relative flex min-h-[calc(100dvh-10rem)] flex-col justify-between overflow-hidden px-6 py-8 text-center">
+        <div className="relative mx-auto flex min-h-[calc(100dvh-10rem)] max-w-lg flex-col justify-between overflow-hidden px-6 py-8 text-center lg:min-h-[calc(100dvh-8rem)]">
             <Mancha className="absolute -top-24 left-1/2 w-[34rem] -translate-x-1/2 text-verde-100" />
             <div className="relative">
                 <img src="/marca/logo-apilado.webp" alt="Red-Cuidar Formosa" width="720" height="500" className="mx-auto h-28 w-auto" />
@@ -121,7 +121,7 @@ const TuManzana = () => {
 
             {ubicacion ? (
                 <>
-                    <div className="mx-5 mt-4 h-44 overflow-hidden rounded-2xl border border-gris-borde">
+                    <div className="mx-5 mt-4 h-44 overflow-hidden rounded-2xl border border-gris-borde lg:h-80">
                         <MapaManzanas
                             centro={[ubicacion.latitud, ubicacion.longitud]}
                             manzanas={cercanas}
@@ -185,16 +185,18 @@ export default function InicioVecino() {
         return <Bienvenida alTerminar={() => { void guardarAjuste('bienvenidaVista', true); setBienvenidaVista(true); }} />;
     }
 
+    // Celular: una columna. Computadora: acciones a la izquierda y el mapa de tu manzana a la derecha.
     return (
-        <div className="space-y-5 px-4 py-6">
-            <div>
-                <h1 className="text-2xl font-black">¡Hola, vecino!</h1>
-                <Manuscrita className="text-2xl text-verde-600">Cuidemos el barrio juntos</Manuscrita>
+        <div className="grid gap-5 px-4 py-6 lg:grid-cols-[1fr_1.15fr] lg:items-start lg:gap-x-10 lg:gap-y-6 lg:py-10">
+            <div className="lg:col-start-1 lg:row-start-1">
+                <h1 className="text-2xl font-black lg:text-4xl">¡Hola, vecino!</h1>
+                <Manuscrita className="text-2xl text-verde-600 lg:text-3xl">Cuidemos el barrio juntos</Manuscrita>
                 <Subrayado className="w-24 text-verde-500" />
             </div>
 
-            <TuManzana />
+            <div className="lg:col-start-2 lg:row-span-2 lg:row-start-1"><TuManzana /></div>
 
+            <div className="space-y-5 lg:col-start-1 lg:row-start-2">
             <BotonEnlace to="/app/escanear?nuevo=1" tamano="grande" anchoCompleto className="h-16 text-lg" icono={<Camera className="size-6" aria-hidden />}>
                 Escanear mi patio
             </BotonEnlace>
@@ -219,6 +221,7 @@ export default function InicioVecino() {
                 <span className="flex-1 text-sm font-bold">Activá las alertas: te avisamos después de cada lluvia.</span>
                 <ChevronRight className="size-4" aria-hidden />
             </Link>
+            </div>
         </div>
     );
 }
