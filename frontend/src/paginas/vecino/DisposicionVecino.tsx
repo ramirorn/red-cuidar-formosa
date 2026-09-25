@@ -83,8 +83,8 @@ export default function DisposicionVecino() {
                 <div className="mx-auto flex h-14 max-w-2xl items-center justify-between gap-3 px-4 lg:h-16 lg:max-w-6xl lg:px-8">
                     <div className="flex min-w-0 items-center gap-1">
                         {subpantalla?.volverA && <BotonAtras respaldo={subpantalla.volverA} directo={subpantalla.directo ?? false} />}
-                        {/* El logo siempre lleva al inicio de la app. */}
-                        <Link to="/app" aria-label="Red-Cuidar Formosa, ir al inicio" className="shrink-0">
+                        {/* El logo lleva a la página principal del sitio; el inicio de la app es la pestaña "Inicio". */}
+                        <Link to="/" aria-label="Red-Cuidar Formosa, ir a la página principal" className="shrink-0">
                             <img src="/marca/logo-horizontal.webp" alt="Red-Cuidar Formosa" width="529" height="234" className="h-10 w-auto lg:h-11" />
                         </Link>
                     </div>
