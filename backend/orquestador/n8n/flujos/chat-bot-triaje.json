@@ -1,0 +1,143 @@
+{
+  "id": "rcfChatBotTriaje",
+  "name": "Chat bot con triaje",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.body.mensaje ?? $json.body.pregunta }}",
+        "options": {
+          "systemMessage": "Eres el asistente virtual de Red Cuidar Formosa, una plataforma de salud de Formosa. Tu objetivo es responder dudas breves sobre prevención de mosquitos, eliminación de agua estancada y síntomas del dengue. Sé muy amable, utiliza lenguaje sencillo y responde en un máximo de 3 oraciones. Si te preguntan algo fuera de este tema, responde que solo ayudas con prevención de salud local.",
+          "enableStreaming": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1184,
+        192
+      ],
+      "id": "c3d484be-d32a-42f9-8a58-2ae51d2f8e13",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.body.sesionId ?? $json.body.conversation_id }}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.4,
+      "position": [
+        1360,
+        448
+      ],
+      "id": "48f994f2-3ba5-4c6a-ab46-9bc788fbfd6a",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "chat-bot",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        832,
+        192
+      ],
+      "id": "a583aa35-8c40-4940-be9f-dd93a3324e7a",
+      "name": "Webhook",
+      "webhookId": "505debe6-54fc-49a3-ae37-2a5d81692a95"
+    },
+    {
+      "parameters": {
+        "model": "={{ $env.MODELO_OLLAMA }}",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        1104,
+        416
+      ],
+      "id": "70f65930-9fa7-4213-99d7-b02b2c1df8e9",
+      "name": "Ollama Chat Model",
+      "credentials": {
+        "ollamaApi": {
+          "id": "rcfOllamaLocal01",
+          "name": "Ollama local"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Triaje de Red Cuidar Formosa: clasifica la consulta del vecino por signos y síntomas de dengue\n// (criterios del Ministerio de Salud) y devuelve { respuesta, nivelTriaje } a la API.\n// No usa el modelo: son reglas fijas, siempre dan el mismo resultado y no fallan.\nconst cuerpo = $('Webhook').first().json.body ?? {};\nconst mensaje = String(cuerpo.mensaje ?? cuerpo.pregunta ?? cuerpo.chatInput ?? '');\nlet respuesta = String($input.first().json.output ?? '').trim();\n\n// Minúsculas y sin tildes; \"no tengo fiebre\" no cuenta como fiebre.\nconst texto = mensaje.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');\nconst negada = (i) => /\\b(no|sin|nunca|ni)\\b[^.,;!?]{0,18}$/.test(texto.slice(Math.max(0, i - 25), i));\nconst aparece = (patron) => [...texto.matchAll(new RegExp(patron.source, 'g'))].some((m) => !negada(m.index));\n\n// Signos de alarma: guardia o 107 ya.\nconst ALARMA = [\n  /dolor (muy )?(fuerte |intenso )?(de |en la |en el )?(panza|abdom\\w*|estomago|barriga)/,\n  /(panza|abdomen|estomago|barriga) (me )?duele (mucho|fuerte)/,\n  /vomit\\w* (mucho|seguido|todo|sin parar|a cada rato|varias veces)|no (para|paro|deja|dejo) de vomitar|vomit\\w* (y |que )?no para/,\n  /sangr\\w*|hemorragia|encias|moretones/,\n  /desmay\\w*|perdi\\w* el conocimiento|convuls\\w*/,\n  /(cuesta|dificultad para|falta el|falta de|no (puedo|puede) ) ?(respirar|aire)|ahog\\w*/,\n  /somnolien\\w*|muy dormid\\w*|no (se )?(despierta|reacciona)|muy irritable|confundid\\w*/,\n  /(manos|pies|piel) (frias|helad\\w*)|labios morados/,\n];\n// Síntomas compatibles con dengue: consultar hoy.\nconst SINTOMAS = [\n  /fiebre|temperatura|calentura|3[89](,|\\.)?\\d? ?(grados)?/,\n  /dolor de cabeza|me duele la cabeza|cefalea/,\n  /detras de los ojos|dolor (de|en los) ojos|me duelen los ojos/,\n  /dolor (muscular|de huesos|articular|de cuerpo|en el cuerpo|en las articulaciones)|me duele (todo )?el cuerpo|me duelen los huesos/,\n  /sarpullido|manchas (rojas|en la piel)|erupcion|brote/,\n  /nauseas|vomit\\w*|diarrea/,\n];\nconst LEVES = [/picad\\w*|me pica|ronchas?|cansad\\w*|malestar|me siento mal|decaid\\w*/];\n\nlet nivelTriaje = 'SIN_RIESGO';\nif (ALARMA.some(aparece)) nivelTriaje = 'URGENTE';\nelse if (SINTOMAS.some(aparece)) nivelTriaje = 'MODERADO';\nelse if (LEVES.some(aparece)) nivelTriaje = 'LEVE';\n\n// Si el modelo no respondió, se devuelve vacío: la API contesta con su asistente básico.\nif (respuesta) {\n  if (nivelTriaje === 'URGENTE' && !respuesta.includes('107')) {\n    respuesta += '\\n\\nLo que contás puede ser un signo de alarma: andá ya a la guardia más cercana o llamá al 107.';\n  }\n  if (nivelTriaje === 'MODERADO' && !/centro de salud|guardia|m[eé]dic/i.test(respuesta)) {\n    respuesta += '\\n\\nConsultá hoy en tu centro de salud y no te automediques: nada de aspirina ni ibuprofeno.';\n  }\n  if (nivelTriaje !== 'SIN_RIESGO') respuesta += '\\n\\nEsta orientación no reemplaza la consulta médica.';\n}\n\nreturn [{ json: { respuesta, nivelTriaje } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1536,
+        192
+      ],
+      "id": "5b0e4f7a-2c1d-4e8b-9a61-7d3f2e9c4b10",
+      "name": "Triaje"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Triaje",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Argentina/Buenos_Aires",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "none"
+  },
+  "pinData": {},
+  "tags": []
+}

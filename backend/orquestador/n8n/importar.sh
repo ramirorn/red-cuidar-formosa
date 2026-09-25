@@ -28,6 +28,12 @@ const credenciales = [
     type: "httpHeaderAuth",
     data: { name: "x-clave-servicio", value: process.env.CLAVE_SERVICIO_INTERNO },
   },
+  {
+    id: "rcfOllamaLocal01",
+    name: "Ollama local",
+    type: "ollamaApi",
+    data: { baseUrl: process.env.URL_OLLAMA },
+  },
 ];
 require("fs").writeFileSync(process.argv[1], JSON.stringify(credenciales));
 ' "$ARCHIVO"
@@ -35,7 +41,7 @@ require("fs").writeFileSync(process.argv[1], JSON.stringify(credenciales));
 n8n import:credentials --input="$ARCHIVO"
 n8n import:workflow --separate --input=/flujos
 
-for ID in rcfClimaAlertas1 rcfMantenimient1 rcfChatMosquito1; do
+for ID in rcfClimaAlertas1 rcfMantenimient1 rcfChatMosquito1 rcfChatBotTriaje; do
   n8n publish:workflow --id="$ID"
 done
 

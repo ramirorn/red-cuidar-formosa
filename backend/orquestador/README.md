@@ -63,6 +63,13 @@ reenvía el mensaje al webhook `chat-mosquito`, protegido con la cabecera `x-cla
 La API guarda **solo el nivel de triaje** en `triajeChat` (el flujo ya no lo hace) y, si detecta un signo de
 alarma, fuerza URGENTE con el 107 aunque el modelo diga otra cosa. El texto de la conversación no se guarda.
 
+### `chat-bot-triaje.json`: Chat con AI Agent y nodo de triaje (webhook `chat-bot`)
+
+Alternativa al flujo anterior: un **AI Agent** de n8n (con memoria por sesión) usa Ollama con la credencial
+"Ollama local" (`URL_OLLAMA`) y el modelo `MODELO_OLLAMA`, y un nodo **Triaje** clasifica la consulta por signos
+y síntomas con reglas fijas y devuelve `{ respuesta, nivelTriaje }`. Para usarlo:
+`URL_CHAT_ORQUESTADOR="http://n8n:5678/webhook/chat-bot"` en el `.env` y `docker compose up -d`.
+
 **Usar otro flujo (por ejemplo, el de otra compu):** pegar su Production URL en `URL_CHAT_ORQUESTADOR` del `.env`
 y reiniciar la API. El contrato (qué se envía y qué formatos de respuesta se aceptan) está en
 `api/src/integraciones/n8nChat.ts`. Se envían `mensaje` y `chatInput`, `sesionId` y `sessionId`, así funciona
