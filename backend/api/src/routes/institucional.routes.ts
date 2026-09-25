@@ -7,7 +7,7 @@ import { listarIntervenciones, registrarIntervencion } from "../controllers/inte
 import { obtenerMapaCalor, obtenerMetricas, obtenerPredicciones } from "../controllers/metrica.controllers.js";
 import { cambiarEstadoReporte, listarReportes, obtenerReporte } from "../controllers/reporte.controllers.js";
 import { cambiarEstadoRuta, generarRuta, listarRutas, marcarParadaVisitada, obtenerRuta } from "../controllers/ruta.controllers.js";
-import { actualizarUsuario, crearUsuario, listarUsuarios } from "../controllers/usuario.controllers.js";
+import { actualizarUsuario, crearUsuario, listarBrigadistas, listarUsuarios } from "../controllers/usuario.controllers.js";
 import { verificarToken } from "../middlewares/autenticacion.middleware.js";
 import { requierePermiso } from "../middlewares/autorizacion.middleware.js";
 import { validarCampos } from "../middlewares/validator.js";
@@ -27,7 +27,7 @@ import {
     validarMarcarParada,
     validarObtenerRuta,
 } from "../validators/ruta.validators.js";
-import { validarActualizarUsuario, validarCrearUsuario, validarListarUsuarios } from "../validators/usuario.validators.js";
+import { validarActualizarUsuario, validarCrearUsuario, validarListarBrigadistas, validarListarUsuarios } from "../validators/usuario.validators.js";
 
 // API Core del Dashboard Institucional.
 // Orden fijo en cada ruta: autenticación -> permiso del rol -> validación -> controlador.
@@ -53,6 +53,7 @@ institucionalRouter.post("/rutas", requierePermiso(PERMISOS.RUTAS_GESTIONAR), va
 institucionalRouter.get("/rutas", requierePermiso(PERMISOS.RUTAS_LEER), validarListarRutas, validarCampos, listarRutas);
 institucionalRouter.get("/rutas/:id", requierePermiso(PERMISOS.RUTAS_LEER), validarObtenerRuta, validarCampos, obtenerRuta);
 institucionalRouter.patch("/rutas/:id/estado", requierePermiso(PERMISOS.RUTAS_EJECUTAR), validarCambiarEstadoRuta, validarCampos, cambiarEstadoRuta);
+institucionalRouter.get("/brigadistas", requierePermiso(PERMISOS.RUTAS_GESTIONAR), validarListarBrigadistas, validarCampos, listarBrigadistas);
 institucionalRouter.patch("/rutas/:id/paradas/:paradaId/visitada", requierePermiso(PERMISOS.RUTAS_EJECUTAR), validarMarcarParada, validarCampos, marcarParadaVisitada);
 
 // Métricas epidemiológicas y mapa de calor

@@ -5,8 +5,10 @@ import {
     cerrarSesionAuthService,
     DURACION_TOKEN_REFRESCO_MS,
     loginAuthService,
+    obtenerUsuarioActualService,
     refrescarAuthService,
 } from '../services/auth.services.js';
+import type { AuthRequest } from '../middlewares/autenticacion.middleware.js';
 import { ErrorHttp, responderError } from '../utils/errorHttp.js';
 
 // El token de refresco viaja solo en una cookie httpOnly: el JavaScript del navegador no
@@ -75,6 +77,20 @@ export const cerrarSesion = async (req: Request, res: Response) => {
 
         res.clearCookie(NOMBRE_COOKIE_REFRESCO, { ...opcionesCookie, maxAge: undefined });
         res.status(204).end();
+
+    } catch (error) {
+        responderError(res, error);
+    }
+};
+
+export const obtenerUsuarioActual = async (req: AuthRequest, res: Response) => {
+    try {
+        const usuario = await obtenerUsuarioActualService(req.usuario!.id);
+
+        res.status(200).json({
+            status: 'success',
+            data: usuario,
+        });
 
     } catch (error) {
         responderError(res, error);

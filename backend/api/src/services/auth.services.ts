@@ -2,6 +2,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import prisma from '../config/prisma.js';
+import { PERMISOS_POR_ROL } from '../config/permisos.js';
 import entorno from '../config/entorno.js';
 import { AUDIENCIA_INSTITUCIONAL, EMISOR_TOKEN } from '../middlewares/autenticacion.middleware.js';
 import { ErrorHttp } from '../utils/errorHttp.js';
@@ -122,4 +123,17 @@ export const revocarSesionesUsuarioService = async (usuarioId: number): Promise<
         where: { usuarioId, revocadoEn: null },
         data: { revocadoEn: new Date() },
     });
+};
+
+// Datos del usuario en sesión para el panel: con ellos arma el menú según los permisos del rol.
+// Los permisos se informan solo para la interfaz; cada ruta los vuelve a verificar en el servidor.
+export const obtenerUsuarioActualService = async (usuarioId: number) => {
+    const usuario = await prisma.usuario.findUnique({
+        where: { id: usuarioId },
+        select: { ...seleccionUsuarioPublico, localidad: { select: { id: true, nombre: true } } },
+    });
+
+    if (!usuario) throw new ErrorHttp(404, 'Recurso no encontrado');
+
+    return { ...usuario, permisos: PERMISOS_POR_ROL[usuario.rol] };
 };

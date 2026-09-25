@@ -114,3 +114,16 @@ export const actualizarUsuarioService = async (administrador: UsuarioAutenticado
 
     return usuario;
 };
+
+// Brigadistas activos a los que se puede asignar una ruta, dentro del alcance territorial.
+export const listarBrigadistasService = async (localidadId: number | null) => prisma.usuario.findMany({
+    where: {
+        rol: 'BRIGADISTA',
+        activo: true,
+        eliminadoEn: null,
+        ...(localidadId !== null ? { localidadId } : {}),
+    },
+    select: { id: true, nombre: true, apellido: true, localidadId: true },
+    orderBy: [{ apellido: 'asc' }, { nombre: 'asc' }],
+    take: 500,
+});

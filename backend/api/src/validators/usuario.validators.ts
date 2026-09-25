@@ -31,3 +31,7 @@ export const validarActualizarUsuario = [
     }),
     body('activo').optional().isBoolean({ strict: true }).withMessage('activo debe ser booleano'),
 ];
+
+export const validarListarBrigadistas = [
+    query('localidadId').optional().isInt({ min: 1 }).withMessage('localidadId inválido').toInt(),
+];

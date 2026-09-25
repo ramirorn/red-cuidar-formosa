@@ -481,6 +481,39 @@ paths:
       responses:
         '204': { description: Sesión cerrada }
 
+  /auth/yo:
+    get:
+      operationId: obtenerUsuarioActual
+      summary: Datos del usuario en sesión, con su localidad y permisos
+      description: Los permisos sirven para armar el menú del panel; cada ruta los verifica igual en el servidor.
+      tags: [Autenticación]
+      security:
+        - institucional: []
+      responses:
+        '200':
+          description: Usuario actual
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Exito'
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/UsuarioPublico'
+                          - type: object
+                            properties:
+                              localidad:
+                                type: [object, 'null']
+                                properties:
+                                  id: { type: integer }
+                                  nombre: { type: string }
+                              permisos:
+                                type: array
+                                items: { type: string, example: 'reportes:leer' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+
   # ---------------------------------------------------------------------------
   # Dashboard institucional
   # ---------------------------------------------------------------------------
@@ -794,6 +827,26 @@ paths:
         '403': { $ref: '#/components/responses/SinPermiso' }
         '404': { $ref: '#/components/responses/NoEncontrado' }
         '409': { $ref: '#/components/responses/Conflicto' }
+
+  /institucional/brigadistas:
+    get:
+      operationId: listarBrigadistas
+      summary: Brigadistas activos para asignar rutas
+      description: 'Permiso `rutas:gestionar`. Los roles locales solo ven los de su localidad.'
+      tags: [Rutas]
+      security:
+        - institucional: []
+      parameters:
+        - $ref: '#/components/parameters/LocalidadId'
+      responses:
+        '200':
+          description: Lista de brigadistas (id, nombre, apellido, localidadId)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Exito' }
+        '400': { $ref: '#/components/responses/SolicitudInvalida' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
 
   /institucional/metricas:
     get:

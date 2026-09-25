@@ -5,9 +5,11 @@ import { registrarAuditoriaService } from '../services/auditoria.services.js';
 import {
     actualizarUsuarioService,
     crearUsuarioService,
+    listarBrigadistasService,
     listarUsuariosService,
     type DatosNuevoUsuario,
 } from '../services/usuario.services.js';
+import { alcanceLocalidad } from '../utils/alcance.js';
 import { responderError } from '../utils/errorHttp.js';
 import { limiteDeConsulta } from '../validators/comun.validators.js';
 
@@ -68,6 +70,22 @@ export const actualizarUsuario = async (req: AuthRequest, res: Response) => {
         res.status(200).json({
             status: 'success',
             data: usuario,
+        });
+
+    } catch (error) {
+        responderError(res, error);
+    }
+};
+
+export const listarBrigadistas = async (req: AuthRequest, res: Response) => {
+    const { localidadId } = matchedData(req, { locations: ['query'] });
+
+    try {
+        const brigadistas = await listarBrigadistasService(alcanceLocalidad(req.usuario!, localidadId));
+
+        res.status(200).json({
+            status: 'success',
+            data: brigadistas,
         });
 
     } catch (error) {

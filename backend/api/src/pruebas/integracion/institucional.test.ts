@@ -220,3 +220,43 @@ describe('autenticación con la base real', () => {
         expect(inexistente.body).toEqual(incorrecta.body);
     });
 });
+
+describe('datos para el panel', () => {
+    it('/auth/yo devuelve la localidad y los permisos del rol, sin la contraseña', async () => {
+        const coordinador = await crearUsuario('COORDINADOR_BRIGADA', territorio.localidades.clorinda);
+
+        const respuesta = await request(app).get('/api/auth/yo').set(conToken(coordinador.token));
+
+        expect(respuesta.status).toBe(200);
+        expect(respuesta.body.data.localidad).toMatchObject({ id: territorio.localidades.clorinda });
+        expect(respuesta.body.data.permisos).toContain('rutas:gestionar');
+        expect(respuesta.body.data.permisos).not.toContain('usuarios:gestionar');
+        expect(respuesta.body.data).not.toHaveProperty('password');
+    });
+
+    it('un coordinador solo ve los brigadistas activos de su localidad', async () => {
+        const coordinador = await crearUsuario('COORDINADOR_BRIGADA', territorio.localidades.clorinda);
+        const propio = await crearUsuario('BRIGADISTA', territorio.localidades.clorinda);
+        await crearUsuario('BRIGADISTA', territorio.localidades.capital);
+        const inactivo = await crearUsuario('BRIGADISTA', territorio.localidades.clorinda);
+        await prisma.usuario.update({ where: { id: inactivo.id }, data: { activo: false } });
+
+        const respuesta = await request(app).get('/api/institucional/brigadistas').set(conToken(coordinador.token));
+        const otraLocalidad = await request(app)
+            .get(`/api/institucional/brigadistas?localidadId=${territorio.localidades.capital}`)
+            .set(conToken(coordinador.token));
+
+        expect(respuesta.status).toBe(200);
+        expect(respuesta.body.data.map((usuario: { id: number }) => usuario.id)).toEqual([propio.id]);
+        expect(respuesta.body.data[0]).not.toHaveProperty('email');
+        expect(otraLocalidad.status).toBe(403);
+    });
+
+    it('un brigadista no puede listar brigadistas', async () => {
+        const brigadista = await crearUsuario('BRIGADISTA', territorio.localidades.clorinda);
+
+        const respuesta = await request(app).get('/api/institucional/brigadistas').set(conToken(brigadista.token));
+
+        expect(respuesta.status).toBe(403);
+    });
+});
