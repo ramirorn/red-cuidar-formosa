@@ -1,6 +1,8 @@
 import prisma from '../config/prisma.js';
 import { ErrorHttp } from '../utils/errorHttp.js';
 
+export const MAXIMO_SUSCRIPCIONES_POR_SESION = 3;
+
 export interface DatosSuscripcion {
     endpoint: string;
     p256dh: string;
@@ -13,6 +15,14 @@ export const guardarSuscripcionService = async (sesionId: string, datos: DatosSu
     if (datos.localidadId !== undefined) {
         const localidad = await prisma.localidad.findUnique({ where: { id: datos.localidadId }, select: { id: true } });
         if (!localidad) throw new ErrorHttp(422, 'La localidad indicada no existe');
+    }
+
+    // Una sesión corresponde a un vecino: alcanza con unos pocos navegadores o dispositivos.
+    const otras = await prisma.suscripcionPush.count({
+        where: { sesionId, activa: true, endpoint: { not: datos.endpoint } },
+    });
+    if (otras >= MAXIMO_SUSCRIPCIONES_POR_SESION) {
+        throw new ErrorHttp(422, `Se permiten como máximo ${MAXIMO_SUSCRIPCIONES_POR_SESION} dispositivos por sesión`);
     }
 
     const campos = {

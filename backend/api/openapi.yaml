@@ -327,7 +327,10 @@ paths:
               type: object
               required: [endpoint, keys]
               properties:
-                endpoint: { type: string, format: uri, description: URL https del servicio push }
+                endpoint:
+                  type: string
+                  format: uri
+                  description: 'URL https de un servicio push de navegador (fcm.googleapis.com, updates.push.services.mozilla.com, *.notify.windows.com, *.push.apple.com). Máximo 3 por sesión.'
                 keys:
                   type: object
                   required: [p256dh, auth]
@@ -344,7 +347,7 @@ paths:
         '400': { $ref: '#/components/responses/SolicitudInvalida' }
         '401': { $ref: '#/components/responses/NoAutenticado' }
         '422':
-          description: La localidad no existe
+          description: La localidad no existe o se superó el máximo de 3 dispositivos por sesión
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }

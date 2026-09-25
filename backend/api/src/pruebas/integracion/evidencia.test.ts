@@ -249,3 +249,23 @@ describe('mapa comunitario', () => {
         expect(features[0].geometry.type).toBe('Polygon');
     });
 });
+
+describe('suscripciones Web Push', () => {
+    const suscribir = (endpoint: string) => request(app)
+        .post('/api/suscripciones-push')
+        .set('Authorization', `Bearer ${sesion.token}`)
+        .send({ endpoint, keys: { p256dh: 'BNcRdreALRFXTkOOUHK1EtK2wtaz5Ry4YfYCA_0QTpQtUbVlUls0VJXg7A8u', auth: 'tBHItJI5svbpez7KI4CCXg' } });
+
+    it('rechaza endpoints que no son de un servicio push', async () => {
+        expect((await suscribir('https://192.168.0.10/recibir')).status).toBe(400);
+    });
+
+    it('admite hasta 3 dispositivos por sesión y actualizar uno existente', async () => {
+        for (const numero of [1, 2, 3]) {
+            expect((await suscribir(`https://fcm.googleapis.com/fcm/send/dispositivo-${numero}`)).status).toBe(201);
+        }
+        expect((await suscribir('https://fcm.googleapis.com/fcm/send/dispositivo-4')).status).toBe(422);
+        expect((await suscribir('https://fcm.googleapis.com/fcm/send/dispositivo-2')).status).toBe(201);
+        expect(await prisma.suscripcionPush.count()).toBe(3);
+    });
+});

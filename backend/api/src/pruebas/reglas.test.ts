@@ -97,3 +97,23 @@ describe('escaparCsv', () => {
         expect(escaparCsv(null)).toBe('');
     });
 });
+
+describe('endpoints Web Push permitidos', async () => {
+    const { esEndpointPushPermitido } = await import('../validators/suscripcion.validators.js');
+
+    it('acepta los servicios push de los navegadores', () => {
+        expect(esEndpointPushPermitido('https://fcm.googleapis.com/fcm/send/abc')).toBe(true);
+        expect(esEndpointPushPermitido('https://updates.push.services.mozilla.com/wpush/v2/abc')).toBe(true);
+        expect(esEndpointPushPermitido('https://db5p.notify.windows.com/w/?token=abc')).toBe(true);
+        expect(esEndpointPushPermitido('https://web.push.apple.com/abc')).toBe(true);
+    });
+
+    it('rechaza IPs, puertos, otros dominios y trucos con el nombre del host', () => {
+        expect(esEndpointPushPermitido('https://10.0.0.5/push')).toBe(false);
+        expect(esEndpointPushPermitido('https://fcm.googleapis.com:8443/x')).toBe(false);
+        expect(esEndpointPushPermitido('http://fcm.googleapis.com/x')).toBe(false);
+        expect(esEndpointPushPermitido('https://fcm.googleapis.com.atacante.com/x')).toBe(false);
+        expect(esEndpointPushPermitido('https://usuario@fcm.googleapis.com/x')).toBe(false);
+        expect(esEndpointPushPermitido('https://notify.windows.com.atacante.net/x')).toBe(false);
+    });
+});
