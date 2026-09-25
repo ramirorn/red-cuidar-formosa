@@ -1,0 +1,102 @@
+@import 'tailwindcss';
+
+/* Tipografías empaquetadas con la app: funcionan sin conexión. */
+@import '@fontsource/nunito/latin-400.css';
+@import '@fontsource/nunito/latin-600.css';
+@import '@fontsource/nunito/latin-700.css';
+@import '@fontsource/nunito/latin-800.css';
+@import '@fontsource/nunito/latin-900.css';
+@import '@fontsource/caveat/latin-600.css';
+@import '@fontsource/caveat/latin-700.css';
+
+/*
+ * Sistema de diseño de Red-Cuidar Formosa.
+ * - Verde "Cuidar" (principal) y rojo "Red" (acento), tomados del logo.
+ * - Para texto blanco sobre verde se usa verde-600: el verde de marca (500) no llega a 4,5:1.
+ * - Los estados de manzana siempre van acompañados de texto o ícono, nunca solo del color.
+ */
+@theme {
+    --color-verde-50: #eef7ef;
+    --color-verde-100: #d6edd9;
+    --color-verde-200: #addbb3;
+    --color-verde-300: #7cc487;
+    --color-verde-400: #4baa5b;
+    --color-verde-500: #1e8c2f;
+    --color-verde-600: #187526;
+    --color-verde-700: #135e1f;
+    --color-verde-800: #0f4a19;
+    --color-verde-900: #0b3613;
+    --color-verde-950: #06200b;
+
+    --color-rojo-50: #feeded;
+    --color-rojo-100: #fcd4d5;
+    --color-rojo-200: #f7a6a8;
+    --color-rojo-300: #f07376;
+    --color-rojo-400: #e8454a;
+    --color-rojo-500: #e11b22;
+    --color-rojo-600: #bd141a;
+    --color-rojo-700: #971015;
+
+    --color-tinta: #1a1a1a;
+    --color-tinta-suave: #4b4f4a;
+    --color-gris-texto: #6b6f6a;
+    --color-gris-borde: #dcdfd8;
+    --color-gris-superficie: #f4f5f2;
+    --color-crema: #fbf8f1;
+    --color-bruma: #eef6ef;
+
+    /* Estados de manzana */
+    --color-estado-rojo: #e11b22;
+    --color-estado-amarillo: #f2b705;
+    --color-estado-verde: #1e8c2f;
+    --color-estado-sin-datos: #bdbdbd;
+
+    --font-sans: 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --font-manuscrita: 'Caveat', 'Comic Sans MS', cursive;
+
+    --radius-tarjeta: 1.25rem;
+    --radius-panel: 1.75rem;
+
+    --shadow-suave: 0 1px 2px rgb(26 26 26 / 0.04), 0 8px 24px -12px rgb(26 26 26 / 0.18);
+    --shadow-elevada: 0 2px 4px rgb(26 26 26 / 0.05), 0 18px 40px -18px rgb(26 26 26 / 0.3);
+
+    --animate-flotar: flotar 6s ease-in-out infinite;
+    --animate-aparecer: aparecer 0.5s ease-out both;
+
+    @keyframes flotar {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-8px); }
+    }
+
+    @keyframes aparecer {
+        from { opacity: 0; transform: translateY(12px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+}
+
+@layer base {
+    html {
+        -webkit-text-size-adjust: 100%;
+        scroll-behavior: smooth;
+    }
+
+    body {
+        @apply bg-white font-sans text-tinta antialiased;
+    }
+
+    :focus-visible {
+        @apply outline-3 outline-offset-2 outline-verde-500;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        html {
+            scroll-behavior: auto;
+        }
+
+        *, *::before, *::after {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+        }
+    }
+}
