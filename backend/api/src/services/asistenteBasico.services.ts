@@ -150,6 +150,13 @@ const TEMAS: TemaFrecuente[] = [
             '• Ver el estado de tu manzana en el mapa.',
     },
     {
+        claves: [/racha/, /insignia|logro/, /desafio/],
+        respuesta:
+            'Tu racha cuenta las semanas seguidas en que revisás el patio con el escáner (alcanza con una vez por semana, aunque no encuentres nada). ' +
+            'Si un mes te salteás una semana, el comodín la salva.\n\n' +
+            'Cada semana tenés desafíos personales y otros de tu zona, y vas ganando insignias. Todo está en "Mi progreso" y se guarda solo en tu celular.',
+    },
+    {
         claves: [/copa|ranking|premio|puntos/],
         respuesta:
             'En la Copa Red-Cuidar compiten las zonas de tu localidad cada mes. Suman las limpiezas validadas, las semanas con la manzana en verde y los criaderos encontrados. ' +

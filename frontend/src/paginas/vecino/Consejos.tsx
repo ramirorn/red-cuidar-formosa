@@ -2,6 +2,7 @@ import { Brush, Bug, Camera, Droplets, RotateCcw, SprayCan, Trash2 } from 'lucid
 import { BotonEnlace } from '@/componentes/ui/Boton';
 import { Tarjeta } from '@/componentes/ui/Tarjeta';
 import { Manuscrita } from '@/componentes/ui/Tipografia';
+import { useActividadAlEntrar } from '@/hooks/useProgreso';
 import { cn } from '@/lib/utils';
 
 const CONSEJOS = [
@@ -19,6 +20,7 @@ const MOSQUITOS = [
 ];
 
 export default function Consejos() {
+    useActividadAlEntrar('CONSEJOS');
     return (
         <div className="space-y-6 px-4 py-6">
             <div>

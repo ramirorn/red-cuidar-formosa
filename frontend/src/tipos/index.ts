@@ -129,3 +129,10 @@ export interface PremioCopa {
     venceEn: string;
     canjeadoEn: string | null;
 }
+
+// Desafíos colectivos de la semana en la zona del vecino.
+export interface DesafiosZona {
+    zona: { id: number; nombre: string };
+    semana: { inicio: string; fin: string };
+    desafios: { clave: 'LIMPIEZAS' | 'VERDES'; titulo: string; meta: number; progreso: number; cumplido: boolean }[];
+}

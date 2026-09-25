@@ -5,6 +5,7 @@ import {
     Camera,
     ChevronRight,
     Crosshair,
+    Flame,
     Lightbulb,
     ListChecks,
     LoaderCircle,
@@ -20,9 +21,11 @@ import { MapaMiManzana } from '@/componentes/mapa/MapaMiManzana';
 import { Boton, BotonEnlace } from '@/componentes/ui/Boton';
 import { ChipEstado } from '@/componentes/ui/ChipEstado';
 import { BotonLlamar107 } from '@/componentes/ui/Llamar107';
+import { BarraProgreso } from '@/componentes/vecino/Progreso';
 import { Tarjeta } from '@/componentes/ui/Tarjeta';
 import { Manuscrita, Rotulo } from '@/componentes/ui/Tipografia';
 import { Mancha, Subrayado } from '@/componentes/ilustraciones/Garabatos';
+import { useProgreso } from '@/hooks/useProgreso';
 import { usePush } from '@/hooks/usePush';
 import { useMiManzana } from '@/hooks/useVecino';
 import { obtenerUbicacion, type Ubicacion } from '@/lib/geo';
@@ -176,6 +179,32 @@ const ACCESOS = [
     { a: '/app/consejos', texto: 'Consejos', Icono: Lightbulb, clases: 'bg-bruma text-verde-800' },
 ];
 
+// Racha y desafíos de la semana, siempre a la vista en el inicio.
+const TuSemana = () => {
+    const { racha, desafios, cargando } = useProgreso();
+    if (cargando) return null;
+    const cumplidos = desafios.filter((desafio) => desafio.cumplido).length;
+    return (
+        <Link to="/app/progreso" className="block rounded-tarjeta border border-gris-borde bg-white p-4 shadow-suave transition hover:-translate-y-0.5">
+            <span className="flex items-center gap-3">
+                <span className={cn('grid size-12 shrink-0 place-items-center rounded-2xl', racha.estaSemanaHecha ? 'bg-amber-400 text-white' : 'bg-amber-50 text-amber-600')}>
+                    <Flame className="size-6" aria-hidden />
+                </span>
+                <span className="min-w-0 flex-1">
+                    <span className="block font-black">{racha.semanas} {racha.semanas === 1 ? 'semana' : 'semanas'} de racha</span>
+                    <span className="block text-sm text-tinta-suave">
+                        {racha.estaSemanaHecha ? 'Esta semana ya está. ' : 'Revisá tu patio esta semana. '}Desafíos: {cumplidos} de {desafios.length}
+                    </span>
+                </span>
+                <ChevronRight className="size-5 shrink-0 text-gris-texto" aria-hidden />
+            </span>
+            <span className="mt-3 flex gap-2">
+                {desafios.map((desafio) => <BarraProgreso key={desafio.clave} className="flex-1" progreso={desafio.progreso} meta={desafio.meta} />)}
+            </span>
+        </Link>
+    );
+};
+
 // Solo se invita a activar las alertas si nunca se activaron ni se rechazaron.
 const InvitacionAlertas = () => {
     const { estado } = usePush();
@@ -219,6 +248,8 @@ export default function InicioVecino() {
             <BotonEnlace to="/app/limpieza" variante="contorno" anchoCompleto icono={<Sparkles className="size-4" aria-hidden />}>
                 Ya limpié: sacar foto de cómo quedó
             </BotonEnlace>
+
+            <TuSemana />
 
             <Link to="/app/copa" className="flex items-center gap-4 rounded-tarjeta border-2 border-verde-600 bg-gradient-to-r from-verde-50 to-white p-4 shadow-suave transition hover:-translate-y-0.5">
                 <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-verde-600 text-white"><Trophy className="size-6" aria-hidden /></span>

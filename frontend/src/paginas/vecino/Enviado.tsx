@@ -1,8 +1,10 @@
-import { useSearchParams } from 'react-router';
-import { CircleAlert, CloudOff, House, ListChecks, PartyPopper } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router';
+import { CircleAlert, CloudOff, Flame, House, ListChecks, PartyPopper, Trophy } from 'lucide-react';
 import { BotonEnlace } from '@/componentes/ui/Boton';
 import { Manuscrita } from '@/componentes/ui/Tipografia';
 import { Mancha } from '@/componentes/ilustraciones/Garabatos';
+import { useProgreso } from '@/hooks/useProgreso';
+import { cn } from '@/lib/utils';
 
 const MENSAJES = {
     enviado: {
@@ -30,6 +32,7 @@ export default function Enviado() {
     const estado = (parametros.get('estado') ?? 'enviado') as keyof typeof MENSAJES;
     const { Icono, titulo, texto, color } = MENSAJES[estado] ?? MENSAJES.enviado;
     const esLimpieza = parametros.get('tipo') === 'LIMPIEZA';
+    const { racha, desafios } = useProgreso();
 
     return (
         <div className="relative overflow-hidden px-6 py-14 text-center">
@@ -44,6 +47,18 @@ export default function Enviado() {
                     <Manuscrita className="mt-4 block text-2xl text-verde-600">
                         {esLimpieza ? '¡Cuando lo confirmen, tu manzana se pinta de verde!' : '¡Cada patio cuenta!'}
                     </Manuscrita>
+                )}
+                {estado !== 'error' && (
+                    <div className="mx-auto mt-6 max-w-sm space-y-2 text-left">
+                        <p className="flex items-center gap-3 rounded-2xl bg-white p-3.5 text-sm shadow-suave">
+                            <Trophy className="size-5 shrink-0 text-verde-600" aria-hidden />
+                            <span>Si lo confirman, suma <strong>+{esLimpieza ? 10 : 1} {esLimpieza ? 'puntos' : 'punto'}</strong> para tu zona en la Copa.</span>
+                        </p>
+                        <Link to="/app/progreso" className="flex items-center gap-3 rounded-2xl bg-white p-3.5 text-sm shadow-suave">
+                            <Flame className={cn('size-5 shrink-0', racha.estaSemanaHecha ? 'fill-amber-400 text-amber-600' : 'text-gris-texto')} aria-hidden />
+                            <span className="flex-1">Racha: <strong>{racha.semanas} {racha.semanas === 1 ? 'semana' : 'semanas'}</strong>. Desafíos: {desafios.filter((desafio) => desafio.cumplido).length} de {desafios.length}</span>
+                        </Link>
+                    </div>
                 )}
                 <div className="mx-auto mt-8 flex max-w-xs flex-col gap-3">
                     <BotonEnlace to="/app/reportes" icono={<ListChecks className="size-4" aria-hidden />}>Ver mis reportes</BotonEnlace>

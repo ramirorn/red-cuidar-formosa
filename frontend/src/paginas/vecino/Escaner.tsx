@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router';
-import { Camera, Flashlight, FlashlightOff, ImagePlus, LoaderCircle, X } from 'lucide-react';
+import { toast } from 'sonner';
+import { Camera, CheckCircle2, Flashlight, FlashlightOff, ImagePlus, LoaderCircle, X } from 'lucide-react';
 import { NOMBRES_CLASE } from '@/deteccion/clases';
 import { useDetector } from '@/deteccion/useDetector';
+import { useRegistrarActividad } from '@/hooks/useProgreso';
 import { useVolver } from '@/hooks/useVolver';
 import { comprimirImagen } from '@/lib/imagenes';
 import { cn } from '@/lib/utils';
@@ -10,6 +12,8 @@ import type { Deteccion, TipoReporte } from '@/tipos';
 import { MAXIMO_FOTOS, useBorrador } from './borrador';
 
 const INTERVALO_DETECCION_MS = 450;
+// Tiempo mínimo recorriendo el patio con la cámara antes de poder decir "está todo bien".
+const REVISION_MINIMA_MS = 8000;
 
 type EstadoCamara = 'iniciando' | 'activa' | 'sin-acceso';
 
@@ -50,6 +54,8 @@ export default function Escaner() {
     const [dimensiones, setDimensiones] = useState({ ancho: 1280, alto: 720 });
     const [linterna, setLinterna] = useState<boolean | null>(null);
     const [procesando, setProcesando] = useState(false);
+    const [revisionLista, setRevisionLista] = useState(false);
+    const registrarActividad = useRegistrarActividad();
 
     const esLimpieza = borrador.tipo === 'LIMPIEZA' || parametros.get('tipo') === 'LIMPIEZA';
 
@@ -115,6 +121,23 @@ export default function Escaner() {
         setLinterna(!linterna);
     };
 
+    useEffect(() => {
+        if (estadoCamara !== 'activa') return undefined;
+        const temporizador = setTimeout(() => setRevisionLista(true), REVISION_MINIMA_MS);
+        return () => clearTimeout(temporizador);
+    }, [estadoCamara]);
+
+    // Revisar el patio cuenta para la racha aunque no aparezca nada (una limpieza se cuenta al enviarla).
+    const contarRevision = useCallback(async () => (esLimpieza ? null : registrarActividad('REVISION')), [esLimpieza, registrarActividad]);
+
+    const todoBien = async () => {
+        const racha = await contarRevision();
+        toast.success('¡Patio revisado!', {
+            description: racha ? `Racha: ${racha.semanas} ${racha.semanas === 1 ? 'semana' : 'semanas'}. Volvé a revisarlo la semana que viene.` : undefined,
+        });
+        navegar('/app/progreso', { replace: true });
+    };
+
     // El escáner se reemplaza en el historial: "volver" desde el reporte no reabre un escáner vacío.
     const terminar = useCallback(() => (desdeReporte ? navegar(-1) : navegar('/app/reportar', { replace: true })), [navegar, desdeReporte]);
 
@@ -129,6 +152,7 @@ export default function Escaner() {
             lienzo.getContext('2d')?.drawImage(elemento, 0, 0);
             const blob = await comprimirImagen(lienzo);
             borrador.agregarFoto({ blob, ancho: lienzo.width, alto: lienzo.height, detecciones, capturadaEn: new Date().toISOString() });
+            await contarRevision();
             terminar();
         } finally {
             setProcesando(false);
@@ -145,6 +169,7 @@ export default function Escaner() {
             const resultado = await detectar(blob);
             borrador.agregarFoto({ blob, ancho: mapa.width, alto: mapa.height, detecciones: resultado, capturadaEn: new Date().toISOString() });
             mapa.close();
+            await contarRevision();
             terminar();
         } finally {
             setProcesando(false);
@@ -223,6 +248,13 @@ export default function Escaner() {
                         </button>
                     ) : <span />}
                 </div>
+                {!esLimpieza && !desdeReporte && borrador.fotos.length === 0 && estadoCamara === 'activa' && (
+                    <button type="button" onClick={() => void todoBien()} disabled={!revisionLista || procesando}
+                        className="mx-auto mt-4 flex items-center gap-2 rounded-full bg-white/10 px-4 py-2.5 text-sm font-extrabold text-white transition hover:bg-white/15 disabled:opacity-40">
+                        <CheckCircle2 className="size-4 text-verde-400" aria-hidden />
+                        {revisionLista ? 'Revisé mi patio: está todo bien' : 'Recorré el patio unos segundos…'}
+                    </button>
+                )}
                 <p className="mt-4 hidden text-center text-xs text-white/60 lg:block">
                     ¿Estás en la computadora? Es más fácil tocar <strong className="text-white/85">Subir foto</strong> y elegir una que sacaste con el celular.
                 </p>

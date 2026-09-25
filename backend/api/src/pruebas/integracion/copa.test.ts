@@ -1,7 +1,7 @@
 import request from 'supertest';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { TipoReporte } from '@prisma/client';
-import { calcularRankingService, cierresSemanales, edicionDe, pedirPremioService } from '../../services/copa.services.js';
+import { calcularRankingService, cierresSemanales, edicionDe, metasDeZona, obtenerDesafiosZonaService, pedirPremioService, semanaArgentina } from '../../services/copa.services.js';
 import { app, crearSesion, crearTerritorio, crearUsuario, limpiarBase, prisma, type Territorio } from './ayudantes.js';
 
 // Edición de agosto de 2026 (hora de Argentina) evaluada en distintos momentos.
@@ -137,6 +137,41 @@ describe('vista pública', () => {
         // El tercero tiene 0,5 puntos por manzana (1 punto en 2 manzanas): con una limpieza lo supera.
         expect(situacion.body.data.faltanLimpiezas).toBe(1);
         expect(podio.body.data.podio.map((zona: { id: number }) => zona.id)).not.toContain(rincon);
+    });
+});
+
+describe('desafíos semanales de la zona', () => {
+    it('la semana va de lunes a lunes en hora argentina', () => {
+        // Domingo 23 de agosto a las 23:30 en Argentina: todavía es la semana del lunes 17.
+        const domingo = semanaArgentina(new Date('2026-08-24T02:30:00Z'));
+        expect(domingo.inicio.toISOString()).toBe('2026-08-17T03:00:00.000Z');
+        expect(domingo.fin.toISOString()).toBe('2026-08-24T03:00:00.000Z');
+        expect(semanaArgentina(new Date('2026-08-24T03:00:00Z')).inicio.toISOString()).toBe('2026-08-24T03:00:00.000Z');
+    });
+
+    it('las metas escalan con el tamaño de la zona', () => {
+        expect(metasDeZona(3)).toEqual({ limpiezas: 3, verdes: 2 });
+        expect(metasDeZona(80)).toEqual({ limpiezas: 10, verdes: 20 });
+        expect(metasDeZona(400).limpiezas).toBe(15);
+    });
+
+    it('cuenta las limpiezas validadas de la semana y las manzanas en verde', async () => {
+        const ahora = new Date('2026-08-20T15:00:00Z');
+        await reporte('capital-00', 'LIMPIEZA', 'VALIDADO', '2026-08-18T12:00:00Z');
+        await reporte('capital-10', 'LIMPIEZA', 'VALIDADO', '2026-08-19T12:00:00Z');
+        await reporte('capital-20', 'LIMPIEZA', 'PENDIENTE', '2026-08-19T12:00:00Z');
+        await reporte('capital-00', 'LIMPIEZA', 'VALIDADO', '2026-08-10T12:00:00Z'); // semana anterior
+        await reporte('capital-01', 'LIMPIEZA', 'VALIDADO', '2026-08-18T12:00:00Z'); // otra zona
+        await prisma.manzana.update({ where: { id: territorio.manzanas['capital-00']! }, data: { estado: 'VERDE' } });
+
+        const { desafios } = await obtenerDesafiosZonaService(zonas.oeste, ahora);
+        expect(desafios).toEqual([
+            expect.objectContaining({ clave: 'LIMPIEZAS', meta: 3, progreso: 2, cumplido: false }),
+            expect.objectContaining({ clave: 'VERDES', meta: 2, progreso: 1, cumplido: false }),
+        ]);
+
+        const publico = await request(app).get(`/api/copa/zonas/${zonas.oeste}/desafios`).expect(200);
+        expect(publico.body.data.desafios).toHaveLength(2);
     });
 });
 

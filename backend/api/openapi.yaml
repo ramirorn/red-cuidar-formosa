@@ -327,6 +327,44 @@ paths:
               schema: { $ref: '#/components/schemas/Exito' }
         '400': { $ref: '#/components/responses/SolicitudInvalida' }
 
+  /copa/zonas/{id}/desafios:
+    get:
+      operationId: obtenerDesafiosZonaCopa
+      summary: Desafíos colectivos de la semana para una zona
+      description: >-
+        Público. Metas de la semana argentina en curso (lunes a lunes): limpiezas validadas entre todos y manzanas
+        en verde. Las metas escalan con la cantidad de manzanas de la zona. No suman puntos aparte de la Copa.
+      tags: [Copa]
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/IdEntero'
+      responses:
+        '200':
+          description: Desafíos de la semana
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Exito'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          zona: { type: object, properties: { id: { type: integer }, nombre: { type: string } } }
+                          semana: { type: object, properties: { inicio: { type: string, format: date-time }, fin: { type: string, format: date-time } } }
+                          desafios:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                clave: { type: string, enum: [LIMPIEZAS, VERDES] }
+                                titulo: { type: string }
+                                meta: { type: integer }
+                                progreso: { type: integer }
+                                cumplido: { type: boolean }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+
   /copa/zonas/{id}:
     get:
       operationId: obtenerSituacionZonaCopa

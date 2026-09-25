@@ -169,6 +169,21 @@ barrios de OpenStreetMap (los de menos de 10 manzanas se suman al vecino y los d
   reportes generaron cada código. Vence a los 30 días del cierre. Coordinación y Administración lo canjean desde
   el panel (una sola vez, con auditoría).
 
+## Racha, desafíos e insignias (gamificación del vecino)
+
+- **Racha:** semanas seguidas (lunes a domingo, hora argentina) en que el vecino revisó el patio: escanear, tocar
+  "Revisé mi patio: está todo bien" (tras unos segundos con la cámara) o enviar un reporte o una limpieza.
+  Un comodín por mes salva una semana salteada (nunca dos seguidas).
+- **Desafíos personales:** revisar el patio 2 veces por semana y uno que rota (mandar una limpieza, mirar el mapa o
+  los consejos).
+- **Desafíos de la zona:** `GET /api/copa/zonas/{id}/desafios`, metas colectivas de la semana (limpiezas validadas y
+  manzanas en verde) que escalan con el tamaño de la zona. No suman puntos aparte de la Copa.
+- **Insignias:** primer patio revisado, rachas de 4 y 12 semanas, primera limpieza confirmada, 3 criaderos
+  confirmados, semana completa y zona en el podio.
+
+Todo lo personal se calcula y se guarda **solo en el celular** (IndexedDB): el servidor no sabe quién tiene qué racha.
+La app avisa cuando confirman un reporte propio (+10 limpieza, +1 criadero para la zona) y cuando se gana una insignia.
+
 ## Control de acceso (RBAC)
 
 Cada ruta institucional pasa por `verificarToken → requierePermiso(permiso) → validación → controlador`.

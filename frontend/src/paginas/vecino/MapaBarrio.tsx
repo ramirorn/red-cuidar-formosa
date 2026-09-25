@@ -3,6 +3,7 @@ import { Camera, ChevronDown, Crosshair, Info, LoaderCircle, X, ZoomIn } from 'l
 import { MapaManzanas } from '@/componentes/mapa/MapaManzanas';
 import { BotonEnlace } from '@/componentes/ui/Boton';
 import { ChipEstado, ESTADOS_MANZANA } from '@/componentes/ui/ChipEstado';
+import { useActividadAlEntrar } from '@/hooks/useProgreso';
 import { useLocalidades, useManzanasDeLocalidad } from '@/hooks/useVecino';
 import type { Recuadro } from '@/api/vecino.api';
 import { CENTRO_FORMOSA_CAPITAL, obtenerUbicacion } from '@/lib/geo';
@@ -14,6 +15,7 @@ import type { EstadoManzana, FeatureManzana } from '@/tipos';
 const ORDEN: EstadoManzana[] = ['VERDE', 'AMARILLO', 'ROJO', 'SIN_DATOS'];
 
 export default function MapaBarrio() {
+    useActividadAlEntrar('MAPA');
     const [centro, setCentro] = useState<[number, number]>(CENTRO_FORMOSA_CAPITAL);
     const [ubicacion, setUbicacion] = useState<[number, number] | null>(null);
     const [recuadro, setRecuadro] = useState<Recuadro | null>(null);

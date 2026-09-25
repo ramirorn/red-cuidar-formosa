@@ -14,6 +14,10 @@ export const validarSituacionZona = [
     esMes(query('mes').optional()),
 ];
 
+export const validarDesafiosZona = [
+    param('id').isInt({ min: 1 }).withMessage('El id no es válido').toInt(),
+];
+
 export const validarPedirPremio = [
     esMes(body('mes')),
     body('idsCliente').isArray({ min: 1, max: 100 }).withMessage('idsCliente debe ser una lista de 1 a 100 identificadores'),

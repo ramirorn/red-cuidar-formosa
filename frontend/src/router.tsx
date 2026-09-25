@@ -21,6 +21,7 @@ const Chat = lazy(() => import('@/paginas/vecino/Chat'));
 const Alertas = lazy(() => import('@/paginas/vecino/Alertas'));
 const Consejos = lazy(() => import('@/paginas/vecino/Consejos'));
 const Copa = lazy(() => import('@/paginas/vecino/Copa'));
+const Progreso = lazy(() => import('@/paginas/vecino/Progreso'));
 
 const RaizPanel = lazy(() => import('@/paginas/panel/RaizPanel'));
 const Ingresar = lazy(() => import('@/paginas/panel/Ingresar'));
@@ -64,6 +65,7 @@ export const router = createBrowserRouter([
                     { path: 'alertas', element: conCarga(<Alertas />), handle: { titulo: 'Alertas', volverA: '/app' } },
                     { path: 'consejos', element: conCarga(<Consejos />), handle: { titulo: 'Consejos', volverA: '/app' } },
                     { path: 'copa', element: conCarga(<Copa />), handle: { titulo: 'Copa Red-Cuidar', volverA: '/app' } },
+                    { path: 'progreso', element: conCarga(<Progreso />), handle: { titulo: 'Mi progreso', volverA: '/app' } },
                 ],
             },
         ],

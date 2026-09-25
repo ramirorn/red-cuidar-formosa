@@ -200,6 +200,56 @@ export const obtenerSituacionZonaService = async (zonaId: number, mes: string) =
 };
 
 // ---------------------------------------------------------------------------
+// Desafíos semanales de la zona: metas colectivas que empujan a la Copa (no suman puntos aparte).
+// ---------------------------------------------------------------------------
+
+const DIA_MS = 24 * HORA_MS;
+
+// Semana argentina de lunes 00:00 a lunes 00:00 (hora de Argentina), en UTC.
+export const semanaArgentina = (ahora = new Date()) => {
+    const local = new Date(ahora.getTime() - DESFASE_ARGENTINA_MS);
+    const desdeLunes = (local.getUTCDay() + 6) % 7;
+    const inicio = new Date(Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() - desdeLunes) + DESFASE_ARGENTINA_MS);
+    return { inicio, fin: new Date(inicio.getTime() + 7 * DIA_MS) };
+};
+
+const acotar = (valor: number, minimo: number, maximo: number) => Math.min(maximo, Math.max(minimo, valor));
+
+// Las metas escalan con el tamaño de la zona para que un barrio chico y uno grande tengan el mismo desafío.
+export const metasDeZona = (manzanas: number) => ({
+    limpiezas: acotar(Math.ceil(manzanas / 8), 3, 15),
+    verdes: acotar(Math.ceil(manzanas / 4), 2, 40),
+});
+
+export const obtenerDesafiosZonaService = async (zonaId: number, ahora = new Date()) => {
+    const zona = await prisma.zonaCompetencia.findUnique({
+        where: { id: zonaId },
+        select: { id: true, nombre: true, _count: { select: { manzanas: true } } },
+    });
+    if (!zona) throw new ErrorHttp(404, 'Recurso no encontrado');
+
+    const semana = semanaArgentina(ahora);
+    const [limpiezas, verdes] = await Promise.all([
+        prisma.reporte.count({
+            where: { tipo: 'LIMPIEZA', estado: { in: ['VALIDADO', 'RESUELTO'] }, createdAt: { gte: semana.inicio, lt: semana.fin }, manzana: { zonaId } },
+        }),
+        prisma.manzana.count({ where: { zonaId, estado: 'VERDE' } }),
+    ]);
+    const metas = metasDeZona(zona._count.manzanas);
+    const desafio = (clave: string, titulo: string, meta: number, progreso: number) =>
+        ({ clave, titulo, meta, progreso: Math.min(progreso, meta), cumplido: progreso >= meta });
+
+    return {
+        zona: { id: zona.id, nombre: zona.nombre },
+        semana: { inicio: semana.inicio.toISOString(), fin: semana.fin.toISOString() },
+        desafios: [
+            desafio('LIMPIEZAS', `Entre todos, ${metas.limpiezas} limpiezas validadas esta semana`, metas.limpiezas, limpiezas),
+            desafio('VERDES', `${metas.verdes} manzanas de la zona en verde`, metas.verdes, verdes),
+        ],
+    };
+};
+
+// ---------------------------------------------------------------------------
 // Premio: código anónimo para quien aportó reportes validados en una zona ganadora.
 // ---------------------------------------------------------------------------
 

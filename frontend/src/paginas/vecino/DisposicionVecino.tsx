@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import { Link, NavLink, Outlet, useMatches, useNavigate } from 'react-router';
 import { ArrowLeft, BellRing, Camera, Trophy, CloudUpload, House, Lightbulb, ListChecks, Map, MessageCircleHeart, Wifi, WifiOff } from 'lucide-react';
 import { BotonEnlace } from '@/componentes/ui/Boton';
+import { ChipRacha } from '@/componentes/vecino/Progreso';
+import { VigiaProgreso } from '@/componentes/vecino/VigiaProgreso';
 import { useColaReportes } from '@/hooks/useColaReportes';
 import { useEnLinea } from '@/hooks/useEnLinea';
 import { useVolver } from '@/hooks/useVolver';
@@ -52,7 +54,7 @@ const IndicadorConexion = () => {
             aria-label={enLinea ? 'En línea' : 'Sin conexión'}
         >
             {enLinea ? <Wifi className="size-4" aria-hidden /> : <WifiOff className="size-4" aria-hidden />}
-            {enLinea ? 'En línea' : 'Sin conexión'}
+            <span className="whitespace-nowrap lg:hidden xl:inline">{enLinea ? 'En línea' : 'Sin conexión'}</span>
             {pendientes > 0 && (
                 <span className="flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-tinta">
                     <CloudUpload className="size-3.5" aria-hidden />{pendientes}
@@ -91,8 +93,9 @@ export default function DisposicionVecino() {
 
     return (
         <div className="flex min-h-dvh flex-col bg-crema">
+            <VigiaProgreso />
             <header className="sticky top-0 z-30 border-b border-gris-borde/70 bg-white/95 pt-[env(safe-area-inset-top)] backdrop-blur">
-                <div className="mx-auto flex h-14 max-w-2xl items-center justify-between gap-3 px-4 lg:h-16 lg:max-w-6xl lg:px-8">
+                <div className="mx-auto flex h-14 max-w-2xl items-center justify-between gap-3 px-4 lg:h-16 lg:max-w-6xl lg:px-8 xl:max-w-7xl">
                     <div className="flex min-w-0 items-center gap-1">
                         {subpantalla?.volverA && <BotonAtras respaldo={subpantalla.volverA} directo={subpantalla.directo ?? false} />}
                         {/* El logo lleva a la página principal del sitio; el inicio de la app es la pestaña "Inicio". */}
@@ -105,11 +108,12 @@ export default function DisposicionVecino() {
                         <ul className="flex items-center gap-1">
                             {NAVEGACION_ESCRITORIO.map(({ a, texto, Icono, fin }) => (
                                 <li key={a}>
-                                    <NavLink to={a} end={fin} className={({ isActive }) => cn(
-                                        'flex items-center gap-2 rounded-full px-3.5 py-2 text-sm font-extrabold transition',
+                                    {/* Entre 1024 y 1280 px solo íconos (con su nombre al pasar el mouse): no entra todo el texto. */}
+                                    <NavLink to={a} end={fin} title={texto} aria-label={texto} className={({ isActive }) => cn(
+                                        'flex items-center gap-2 rounded-full px-3 py-2 text-sm font-extrabold transition xl:px-3.5',
                                         isActive ? 'bg-verde-100 text-verde-800' : 'text-tinta-suave hover:bg-gris-superficie hover:text-tinta',
                                     )}>
-                                        <Icono className="size-4" strokeWidth={2.4} aria-hidden />{texto}
+                                        <Icono className="size-4" strokeWidth={2.4} aria-hidden /><span className="hidden xl:inline">{texto}</span>
                                     </NavLink>
                                 </li>
                             ))}
@@ -118,6 +122,7 @@ export default function DisposicionVecino() {
 
                     <div className="flex items-center gap-2">
                         <BotonEnlace to="/app/escanear?nuevo=1" tamano="chico" className="hidden lg:inline-flex" icono={<Camera className="size-4" aria-hidden />}>Escanear</BotonEnlace>
+                        <ChipRacha />
                         <IndicadorConexion />
                     </div>
                 </div>

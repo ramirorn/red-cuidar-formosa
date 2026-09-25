@@ -31,6 +31,14 @@ export interface ReporteEnCola {
     creadoEn: string;
 }
 
+// Lo que hace el vecino para su racha y sus desafíos. Queda solo en el celular.
+export type TipoActividad = 'REVISION' | 'REPORTE' | 'LIMPIEZA' | 'MAPA' | 'CONSEJOS';
+export interface Actividad {
+    id?: number;
+    tipo: TipoActividad;
+    fecha: string;
+}
+
 export interface MensajeGuardado {
     id?: number;
     rol: 'usuario' | 'asistente';
@@ -72,12 +80,13 @@ interface EsquemaLocal extends DBSchema {
     alertas: { key: number; value: AlertaRecibida };
     propios: { key: string; value: ReportePropio; indexes: { porCreacion: string } };
     manzanas: { key: number; value: ManzanasDeLocalidad };
+    actividad: { key: number; value: Actividad; indexes: { porFecha: string } };
 }
 
 let conexion: Promise<IDBPDatabase<EsquemaLocal>> | null = null;
 
 export const abrirBase = () => {
-    conexion ??= openDB<EsquemaLocal>('red-cuidar-formosa', 2, {
+    conexion ??= openDB<EsquemaLocal>('red-cuidar-formosa', 3, {
         upgrade(bd, versionAnterior, _versionNueva, transaccion) {
             if (versionAnterior < 1) {
                 bd.createObjectStore('ajustes');
@@ -93,6 +102,9 @@ export const abrirBase = () => {
                     void transaccion.objectStore('cola').clear();
                     void transaccion.objectStore('ajustes').delete('ultimaUbicacion');
                 }
+            }
+            if (versionAnterior < 3) {
+                bd.createObjectStore('actividad', { keyPath: 'id', autoIncrement: true }).createIndex('porFecha', 'fecha');
             }
         },
     });

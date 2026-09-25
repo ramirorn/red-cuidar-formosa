@@ -7,6 +7,7 @@ import {
     mesArgentino,
     obtenerPodioService,
     obtenerRankingInstitucionalService,
+    obtenerDesafiosZonaService,
     obtenerSituacionZonaService,
     pedirPremioService,
 } from '../services/copa.services.js';
@@ -24,6 +25,23 @@ export const obtenerPodio = async (req: Request, res: Response) => {
         res.status(200).json({
             status: 'success',
             data: podio,
+        });
+
+    } catch (error) {
+        responderError(res, error);
+    }
+};
+
+export const obtenerDesafiosZona = async (req: Request, res: Response) => {
+    const { id } = matchedData(req, { locations: ['params'] });
+
+    try {
+        const desafios = await obtenerDesafiosZonaService(id);
+
+        res.set('Cache-Control', 'public, max-age=60');
+        res.status(200).json({
+            status: 'success',
+            data: desafios,
         });
 
     } catch (error) {

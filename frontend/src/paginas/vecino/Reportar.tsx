@@ -7,6 +7,7 @@ import { ChipEstado } from '@/componentes/ui/ChipEstado';
 import { Tarjeta } from '@/componentes/ui/Tarjeta';
 import { EditorRecorte } from '@/componentes/vecino/EditorRecorte';
 import { NOMBRES_CLASE } from '@/deteccion/clases';
+import { useRegistrarActividad } from '@/hooks/useProgreso';
 import { useMiManzana } from '@/hooks/useVecino';
 import { useColaReportes } from '@/hooks/useColaReportes';
 import { estaEnFormosa, obtenerUbicacion, type Ubicacion } from '@/lib/geo';
@@ -74,6 +75,7 @@ const resumirDetecciones = (fotos: FotoBorrador[]) => {
 export default function Reportar() {
     const navegar = useNavigate();
     const borrador = useBorrador();
+    const registrarActividad = useRegistrarActividad();
     const { sincronizar } = useColaReportes();
     const [ubicacion, setUbicacion] = useState<Ubicacion | null>(null);
     const [errorUbicacion, setErrorUbicacion] = useState<string | null>(null);
@@ -139,6 +141,9 @@ export default function Reportar() {
             detecciones: todas,
             fotos: recortes.map((recorte) => recorte.blob),
         });
+
+        // Enviar un reporte o una limpieza también cuenta como "cuidé el patio" esta semana.
+        await registrarActividad(tipo === 'LIMPIEZA' ? 'LIMPIEZA' : 'REPORTE');
 
         await pedirSincronizacionEnSegundoPlano();
         const resultado = await sincronizar({ silencioso: true });

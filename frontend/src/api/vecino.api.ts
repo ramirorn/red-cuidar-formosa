@@ -1,5 +1,5 @@
 import { clientePublico, clienteVecino, datosDe } from './cliente';
-import type { ColeccionManzanas, Localidad, PodioCopa, PremioCopa, ReporteResumen, RespuestaChat, SituacionZona } from '@/tipos';
+import type { ColeccionManzanas, DesafiosZona, Localidad, PodioCopa, PremioCopa, ReporteResumen, RespuestaChat, SituacionZona } from '@/tipos';
 
 export interface Recuadro {
     longitudMinima: number;
@@ -32,6 +32,8 @@ export const vecinoApi = {
         datosDe<PodioCopa>(await clientePublico.get('/copa', { params: { localidadId, ...(mes ? { mes } : {}) } })),
     copaZona: async (zonaId: number, mes?: string) =>
         datosDe<SituacionZona>(await clientePublico.get(`/copa/zonas/${zonaId}`, { params: mes ? { mes } : {} })),
+    desafiosZona: async (zonaId: number) =>
+        datosDe<DesafiosZona>(await clientePublico.get(`/copa/zonas/${zonaId}/desafios`)),
     pedirPremio: async (mes: string, idsCliente: string[]) =>
         datosDe<PremioCopa | null>(await clienteVecino.post('/copa/premio', { mes, idsCliente })),
 
