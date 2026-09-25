@@ -6,10 +6,15 @@ import { fileTypeFromBuffer } from 'file-type';
 import entorno from '../config/entorno.js';
 import { MIMES_PERMITIDOS } from '../middlewares/subidaImagen.middleware.js';
 import { ErrorHttp } from '../utils/errorHttp.js';
+import { crearSemaforo } from '../utils/semaforo.js';
 
 const LADO_MAXIMO_PX = 1920;
 const LADO_MINIMO_PX = 64;
-const PIXELES_MAXIMOS_ENTRADA = 40_000_000;
+// ~25 MP cubre cualquier cámara de celular; por encima se rechaza antes de decodificar.
+const PIXELES_MAXIMOS_ENTRADA = 25_000_000;
+
+// Decodificar una foto grande ocupa ~100 MB de memoria: se procesan pocas a la vez.
+const conLugarParaProcesar = crearSemaforo(2, 50, 'El servidor está procesando muchas imágenes; intentá de nuevo en unos segundos');
 
 export interface ImagenProcesada {
     contenido: Buffer;
@@ -31,8 +36,26 @@ export const procesarImagenService = async (original: Buffer): Promise<ImagenPro
         throw new ErrorHttp(415, 'El archivo no es una imagen JPEG, PNG o WebP válida');
     }
 
+    // Las dimensiones se leen del encabezado, sin decodificar: una imagen de pocos KB puede declarar
+    // millones de píxeles (bomba de descompresión).
+    const metadatos = await sharp(original).metadata().catch(() => null);
+    if (!metadatos?.width || !metadatos.height) {
+        throw new ErrorHttp(422, 'La imagen está dañada o no se puede procesar');
+    }
+    if (metadatos.width * metadatos.height > PIXELES_MAXIMOS_ENTRADA) {
+        throw new ErrorHttp(413, 'La imagen tiene demasiada resolución (máximo 25 megapíxeles)');
+    }
+
+    return conLugarParaProcesar(() => recodificar(original));
+};
+
+const recodificar = async (original: Buffer): Promise<ImagenProcesada> => {
     try {
-        const { data, info } = await sharp(original, { limitInputPixels: PIXELES_MAXIMOS_ENTRADA, failOn: 'error' })
+        const { data, info } = await sharp(original, {
+            limitInputPixels: PIXELES_MAXIMOS_ENTRADA,
+            failOn: 'error',
+            sequentialRead: true,
+        })
             .rotate()
             .resize({ width: LADO_MAXIMO_PX, height: LADO_MAXIMO_PX, fit: 'inside', withoutEnlargement: true })
             .jpeg({ quality: 80, mozjpeg: true })

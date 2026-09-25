@@ -49,6 +49,7 @@ services:
     build: ./api
     container_name: rcf_api
     restart: always
+    mem_limit: 1g
     environment:
       NODE_ENV: development
       PORT: 3000
@@ -86,6 +87,7 @@ services:
     build: ./motor-predictivo
     container_name: rcf_motor_predictivo
     restart: always
+    mem_limit: 512m
     environment:
       URL_BASE_DATOS: postgresql://rol_motor:${DB_MOTOR_PASSWORD}@db:5432/red_cuidar
       URL_REDIS: redis://:${REDIS_PASSWORD}@redis:6379

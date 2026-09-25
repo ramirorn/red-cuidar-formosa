@@ -159,6 +159,26 @@ describe('recepción de reportes con PostGIS', () => {
     });
 });
 
+describe('protección de memoria', () => {
+    it('rechaza sin decodificar una imagen chica en bytes pero de 30 megapíxeles', async () => {
+        const bomba = await sharp({ create: { width: 6000, height: 5000, channels: 3, background: '#00aa00' } }).png().toBuffer();
+        expect(bomba.length).toBeLessThan(1024 * 1024);
+
+        const respuesta = await request(app)
+            .post('/api/reportes')
+            .set('Authorization', `Bearer ${sesion.token}`)
+            .field('idCliente', crypto.randomUUID())
+            .field('tipo', 'CRIADERO')
+            .field('latitud', String(puntoDe('capital-00').latitud))
+            .field('longitud', String(puntoDe('capital-00').longitud))
+            .field('capturadoEn', new Date().toISOString())
+            .attach('imagenes', bomba, { filename: 'bomba.png', contentType: 'image/png' });
+
+        expect(respuesta.status).toBe(413);
+        expect(await prisma.reporte.count()).toBe(0);
+    });
+});
+
 describe('idempotencia del Background Sync', () => {
     it('un reintento con el mismo idCliente devuelve el mismo reporte sin duplicar nada', async () => {
         const idCliente = crypto.randomUUID();
