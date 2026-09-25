@@ -46,30 +46,34 @@ export const generarRutaService = async (usuario: UsuarioAutenticado, datos: Dat
 
     const maxParadas = datos.maxParadas ?? PARADAS_POR_DEFECTO;
 
-    const candidatas = await prisma.$queryRaw<ManzanaCandidata[]>`
-        SELECT m."id", m."codigo", m."estado",
-               ST_Y(m."centroide") AS "latitud", ST_X(m."centroide") AS "longitud"
-        FROM "manzana" m
-        WHERE m."localidadId" = ${localidadId}
-          AND m."estado" IN ('ROJO', 'AMARILLO')
-          AND NOT EXISTS (
-              SELECT 1 FROM "paradaRuta" p
-              JOIN "rutaBrigada" r ON r."id" = p."rutaId"
-              WHERE p."manzanaId" = m."id"
-                AND r."fecha" = ${datos.fecha}::date
-                AND r."estado" IN ('PLANIFICADA', 'EN_CURSO')
-          )
-        ORDER BY (m."estado" = 'ROJO') DESC, m."ultimoReporteEn" DESC NULLS LAST, m."id"
-        LIMIT ${maxParadas}
-    `;
+    // Un bloqueo por (localidad, fecha) evita que dos coordinadores que generan rutas a la vez
+    // se asignen las mismas manzanas: la selección y la creación ocurren dentro del mismo bloqueo.
+    const { ruta, distanciaTotalM } = await prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`ruta:${localidadId}:${datos.fecha}`}))`;
 
-    if (candidatas.length === 0) {
-        throw new ErrorHttp(422, 'No hay manzanas en rojo o amarillo pendientes de visita para esa fecha');
-    }
+        const candidatas = await tx.$queryRaw<ManzanaCandidata[]>`
+            SELECT m."id", m."codigo", m."estado",
+                   ST_Y(m."centroide") AS "latitud", ST_X(m."centroide") AS "longitud"
+            FROM "manzana" m
+            WHERE m."localidadId" = ${localidadId}
+              AND m."estado" IN ('ROJO', 'AMARILLO')
+              AND NOT EXISTS (
+                  SELECT 1 FROM "paradaRuta" p
+                  JOIN "rutaBrigada" r ON r."id" = p."rutaId"
+                  WHERE p."manzanaId" = m."id"
+                    AND r."fecha" = ${datos.fecha}::date
+                    AND r."estado" IN ('PLANIFICADA', 'EN_CURSO')
+              )
+            ORDER BY (m."estado" = 'ROJO') DESC, m."ultimoReporteEn" DESC NULLS LAST, m."id"
+            LIMIT ${maxParadas}
+        `;
 
-    const { orden, distanciaTotalM } = ordenarPorVecinoMasCercano(candidatas, datos.inicio);
+        if (candidatas.length === 0) {
+            throw new ErrorHttp(422, 'No hay manzanas en rojo o amarillo pendientes de visita para esa fecha');
+        }
 
-    const ruta = await prisma.$transaction(async (tx) => {
+        const { orden, distanciaTotalM: distancia } = ordenarPorVecinoMasCercano(candidatas, datos.inicio);
+
         const nueva = await tx.rutaBrigada.create({
             data: {
                 localidadId,
@@ -84,7 +88,7 @@ export const generarRutaService = async (usuario: UsuarioAutenticado, datos: Dat
             data: orden.map((manzana, indice) => ({ rutaId: nueva.id, manzanaId: manzana.id, orden: indice + 1 })),
         });
 
-        return nueva;
+        return { ruta: nueva, distanciaTotalM: distancia };
     });
 
     const detalle = await obtenerRutaService(usuario, ruta.id);

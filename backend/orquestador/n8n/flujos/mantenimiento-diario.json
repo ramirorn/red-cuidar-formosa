@@ -62,7 +62,8 @@
           "id": "rcfClaveServici1",
           "name": "Clave de servicio interno"
         }
-      }
+      },
+      "onError": "continueRegularOutput"
     },
     {
       "id": "6b88abe3-3adb-5505-801c-3ec7e18634bf",

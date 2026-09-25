@@ -176,7 +176,7 @@
     "executionOrder": "v1",
     "timezone": "America/Argentina/Buenos_Aires",
     "saveDataSuccessExecution": "none",
-    "saveDataErrorExecution": "all"
+    "saveDataErrorExecution": "none"
   },
   "pinData": {},
   "tags": []

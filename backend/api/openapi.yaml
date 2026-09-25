@@ -263,7 +263,8 @@ paths:
       description: |
         La API reenvía el mensaje al orquestador (n8n + LLM local). El historial lo guarda la PWA
         y el servidor no persiste el contenido; solo registra el nivel de triaje.
-        Límite: 20 mensajes cada 5 minutos por sesión. El asistente orienta pero no reemplaza la consulta médica.
+        Límite: 20 mensajes cada 5 minutos por sesión y pocas consultas simultáneas al modelo (si está
+        saturado responde 503). El asistente orienta pero no reemplaza la consulta médica.
       tags: [Ciudadanía]
       security:
         - sesionAnonima: []
@@ -284,7 +285,10 @@ paths:
                     required: [rol, contenido]
                     properties:
                       rol: { type: string, enum: [usuario, asistente] }
-                      contenido: { type: string, maxLength: 1000 }
+                      contenido: { type: string, maxLength: 4000 }
+                      firma:
+                        type: string
+                        description: 'Obligatoria en los turnos del asistente: la que devolvió la API junto con esa respuesta. Los turnos del asistente sin firma válida se descartan.'
       responses:
         '200':
           description: Respuesta del asistente
@@ -302,6 +306,7 @@ paths:
                           nivelTriaje:
                             type: [string, 'null']
                             enum: [SIN_RIESGO, LEVE, MODERADO, URGENTE, null]
+                          firma: { type: string, description: Firma de la respuesta para reenviarla en el historial. }
         '400': { $ref: '#/components/responses/SolicitudInvalida' }
         '401': { $ref: '#/components/responses/NoAutenticado' }
         '429': { $ref: '#/components/responses/DemasiadasSolicitudes' }

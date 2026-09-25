@@ -11,7 +11,11 @@ export const enviarMensajeChat = async (req: AuthRequest, res: Response) => {
         const resultado = await enviarMensajeChatService(
             req.sesion!.id,
             mensaje,
-            ((historial ?? []) as MensajeHistorial[]).map(({ rol, contenido }) => ({ rol, contenido })),
+            ((historial ?? []) as MensajeHistorial[]).map(({ rol, contenido, firma }) => ({
+                rol,
+                contenido,
+                ...(typeof firma === 'string' ? { firma } : {}),
+            })),
         );
 
         res.status(200).json({

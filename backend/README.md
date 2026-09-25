@@ -193,3 +193,18 @@ Los listados usan paginación por cursor (`limite` ≤ 200, `cursor` opaco) y lo
   exportaciones por lotes con paginación keyset y control de contrapresión.
 - **Infraestructura:** red interna sin salida a internet para la base, Redis y el motor; contenedores sin root;
   un rol de base de datos por servicio; límites de tasa (los reportes, por sesión, por el CGNAT de las redes móviles).
+
+## Pendiente (revisión de seguridad)
+
+Hallazgos de la revisión independiente que quedan para una próxima etapa:
+
+- **Separar roles de base:** hoy `rol_api` es dueño del esquema y también atiende la API. Conviene un
+  `rol_migrador` que corra las migraciones y un `rol_api` con permisos de lectura y escritura únicamente.
+- **Creación masiva de sesiones:** el límite por IP es holgado por el CGNAT. Para frenar abusos sin bloquear
+  vecinos hace falta un desafío liviano (prueba de trabajo o captcha) en `POST /api/sesiones`.
+- **Fotos casi idénticas:** el control de reutilización compara el hash exacto del archivo. Un hash perceptual
+  detectaría la misma foto recortada o re-guardada (hoy lo mitiga la validación humana).
+- **Refresco en dos pestañas a la vez:** puede disparar la revocación por reutilización. Una ventana de gracia
+  de unos segundos lo evitaría.
+- **Producción:** fijar versiones de imágenes (`n8n`, `ollama`), un compose de producción con TLS, `NODE_ENV=production`,
+  `CONFIAR_PROXY` según el proxy, y las rutas `/api/interno/*` fuera del puerto público.
