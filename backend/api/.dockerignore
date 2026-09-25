@@ -1,5 +1,6 @@
 node_modules
 dist
-almacenamiento
 .env
+almacenamiento
+coverage
 *.log

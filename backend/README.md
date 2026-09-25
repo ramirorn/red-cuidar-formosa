@@ -33,6 +33,9 @@ docker compose exec api npm run semilla   # localidades, primer administrador y 
 - Frontend en `http://localhost:5173`: PWA del vecino en `/app` y panel institucional en `/panel`.
   Vite reenvía `/api` a la API, así el navegador ve un solo origen (necesario para la cookie de refresco).
   En Docker Desktop (Mac/Windows), si la recarga en caliente no detecta cambios: `VIGILAR_CON_SONDEO=1` en `.env`.
+- Sin Docker: `cd api && npm install && npm run migrar && npm run semilla && npm run dev`.
+  Usar siempre los scripts (`npm run migrar`, `npm run generar-cliente`) y no `npx prisma`: si Prisma no
+  está instalado, npx descarga la última versión (7), que no es compatible con este esquema.
 - La base no publica puertos: `docker compose exec db psql -U postgres -d red_cuidar`.
 
 Pruebas:
