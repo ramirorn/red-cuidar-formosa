@@ -36,6 +36,9 @@ docker compose exec api npm run semilla   # localidades, primer administrador y 
 - Sin Docker: `cd api && npm install && npm run migrar && npm run semilla && npm run dev`.
   Usar siempre los scripts (`npm run migrar`, `npm run generar-cliente`) y no `npx prisma`: si Prisma no
   está instalado, npx descarga la última versión (7), que no es compatible con este esquema.
+- Las claves de la base (`POSTGRES_PASSWORD`, `DB_*_PASSWORD`) se aplican solo al crear el volumen. Si se cambian
+  después, o si el primer arranque falló, hay que recrearlo: `docker compose down -v && docker compose up -d`
+  (borra los datos). Usar claves con letras, números, `-` o `_`: van dentro de la URL de conexión.
 - La base no publica puertos: `docker compose exec db psql -U postgres -d red_cuidar`.
 
 Pruebas:
