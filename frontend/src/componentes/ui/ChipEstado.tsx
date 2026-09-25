@@ -1,7 +1,8 @@
 import { CircleAlert, CircleCheck, CircleDashed, TriangleAlert } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import type { EstadoManzana } from '@/tipos';
 
-export type EstadoManzana = 'ROJO' | 'AMARILLO' | 'VERDE' | 'SIN_DATOS';
+export type { EstadoManzana };
 
 export const ESTADOS_MANZANA: Record<EstadoManzana, { etiqueta: string; descripcion: string; clases: string; color: string; Icono: typeof CircleAlert }> = {
     ROJO: {

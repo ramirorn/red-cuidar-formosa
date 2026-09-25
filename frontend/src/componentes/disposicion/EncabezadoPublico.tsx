@@ -47,7 +47,7 @@ export const EncabezadoPublico = () => {
                         <NavLink to="/panel" className="hidden text-sm font-bold text-gris-texto hover:text-tinta md:block">
                             Acceso institucional
                         </NavLink>
-                        <BotonEnlace to="/app" variante="acento" tamano="chico" className="hidden sm:inline-flex">
+                        <BotonEnlace to="/app/escanear?nuevo=1" variante="acento" tamano="chico" className="hidden sm:inline-flex">
                             Escanear mi patio
                         </BotonEnlace>
                         <button
