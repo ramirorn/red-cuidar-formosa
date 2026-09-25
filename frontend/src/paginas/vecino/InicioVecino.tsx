@@ -19,9 +19,11 @@ import {
 import { MapaMiManzana } from '@/componentes/mapa/MapaMiManzana';
 import { Boton, BotonEnlace } from '@/componentes/ui/Boton';
 import { ChipEstado } from '@/componentes/ui/ChipEstado';
+import { BotonLlamar107 } from '@/componentes/ui/Llamar107';
 import { Tarjeta } from '@/componentes/ui/Tarjeta';
 import { Manuscrita, Rotulo } from '@/componentes/ui/Tipografia';
 import { Mancha, Subrayado } from '@/componentes/ilustraciones/Garabatos';
+import { usePush } from '@/hooks/usePush';
 import { useMiManzana } from '@/hooks/useVecino';
 import { obtenerUbicacion, type Ubicacion } from '@/lib/geo';
 import { cn } from '@/lib/utils';
@@ -174,6 +176,19 @@ const ACCESOS = [
     { a: '/app/consejos', texto: 'Consejos', Icono: Lightbulb, clases: 'bg-bruma text-verde-800' },
 ];
 
+// Solo se invita a activar las alertas si nunca se activaron ni se rechazaron.
+const InvitacionAlertas = () => {
+    const { estado } = usePush();
+    if (estado !== 'inactivo') return null;
+    return (
+        <Link to="/app/alertas" className="flex items-center gap-3 rounded-tarjeta bg-verde-600 p-4 text-white shadow-suave">
+            <BellRing className="size-6 shrink-0" aria-hidden />
+            <span className="flex-1 text-sm font-bold">Activá las alertas: te avisamos después de cada lluvia.</span>
+            <ChevronRight className="size-4" aria-hidden />
+        </Link>
+    );
+};
+
 export default function InicioVecino() {
     const [bienvenidaVista, setBienvenidaVista] = useState<boolean | null>(null);
 
@@ -226,11 +241,15 @@ export default function InicioVecino() {
                 ))}
             </nav>
 
-            <Link to="/app/alertas" className="flex items-center gap-3 rounded-tarjeta bg-verde-600 p-4 text-white shadow-suave">
-                <BellRing className="size-6 shrink-0" aria-hidden />
-                <span className="flex-1 text-sm font-bold">Activá las alertas: te avisamos después de cada lluvia.</span>
-                <ChevronRight className="size-4" aria-hidden />
-            </Link>
+            <InvitacionAlertas />
+
+            <div className="flex items-center gap-3 rounded-tarjeta border border-rojo-200 bg-rojo-50 p-4">
+                <span className="flex-1 text-sm leading-snug">
+                    <span className="block font-extrabold text-rojo-700">¿Fiebre con dolor fuerte de panza, vómitos o sangrado?</span>
+                    <span className="text-tinta-suave">Es una urgencia: llamá ya.</span>
+                </span>
+                <BotonLlamar107 compacto className="shrink-0" />
+            </div>
             </div>
         </div>
     );

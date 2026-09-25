@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { Phone, SendHorizontal, Trash2, TriangleAlert } from 'lucide-react';
+import { SendHorizontal, Trash2, TriangleAlert } from 'lucide-react';
+import { BotonLlamar107, ENLACE_107 } from '@/componentes/ui/Llamar107';
 import { cn } from '@/lib/utils';
 import { useChat } from '@/hooks/useChat';
 import { useEnLinea } from '@/hooks/useEnLinea';
@@ -46,6 +47,7 @@ export default function Chat() {
                     <h1 className="font-black">IA Mosquito</h1>
                     <p className="text-xs text-gris-texto">Te oriento sobre dengue y criaderos</p>
                 </div>
+                <BotonLlamar107 compacto />
                 {mensajes.length > 0 && (
                     <button type="button" onClick={borrarConversacion} aria-label="Borrar la conversación" className="grid size-10 place-items-center rounded-full text-gris-texto hover:bg-gris-superficie">
                         <Trash2 className="size-4" aria-hidden />
@@ -55,7 +57,7 @@ export default function Chat() {
 
             <p className="flex items-center gap-2 bg-gris-superficie px-4 py-2 text-xs font-bold text-tinta-suave">
                 <TriangleAlert className="size-4 shrink-0 text-amber-600" aria-hidden />
-                <span>No reemplaza la consulta médica. Ante una urgencia, llamá al <a href="tel:107" className="text-rojo-600 underline">107</a>.</span>
+                <span>No reemplaza la consulta médica. Ante una urgencia, llamá al <a href={ENLACE_107} className="text-rojo-600 underline">107</a>.</span>
             </p>
 
             <div ref={lista} className="flex-1 space-y-3 overflow-y-auto px-4 py-4" aria-live="polite">
@@ -80,9 +82,7 @@ export default function Chat() {
                             </p>
                             {mensaje.origen === 'basico' && <span className="mt-1 px-2 text-[0.7rem] text-gris-texto">Respuesta automática del asistente básico</span>}
                             {mensaje.nivelTriaje === 'URGENTE' && (
-                                <a href="tel:107" className="mt-2 flex items-center gap-3 rounded-2xl bg-rojo-500 px-4 py-3 font-extrabold text-white shadow-suave">
-                                    <Phone className="size-5" aria-hidden />Llamar al 107
-                                </a>
+                                <BotonLlamar107 className="mt-2 max-w-[85%]" />
                             )}
                         </div>
                     );

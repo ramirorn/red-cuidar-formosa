@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { vecinoApi } from '@/api/vecino.api';
-import { guardarAjuste, leerAjuste } from '@/sinConexion/bd';
+import { borrarAjuste, guardarAjuste, leerAjuste } from '@/sinConexion/bd';
 import { errorAmigable } from '@/lib/errores';
 
 const aUint8 = (base64: string) => {
@@ -9,7 +9,10 @@ const aUint8 = (base64: string) => {
     return Uint8Array.from(binario, (letra) => letra.charCodeAt(0));
 };
 
-export type EstadoPush = 'cargando' | 'no-soportado' | 'denegado' | 'inactivo' | 'activo';
+// rechazado: el vecino eligió no recibir alertas (queda guardado hasta que toque "Quiero recibirlas").
+export type EstadoPush = 'cargando' | 'no-soportado' | 'rechazado' | 'denegado' | 'inactivo' | 'activo';
+
+const RECHAZO = 'alertasRechazadas';
 
 // Suscripción a las alertas post-lluvia (Web Push).
 export const usePush = () => {
@@ -21,11 +24,12 @@ export const usePush = () => {
 
     const actualizar = useCallback(async () => {
         if (!soportado) return setEstado('no-soportado');
-        if (Notification.permission === 'denied') return setEstado('denegado');
         setLocalidadId(await leerAjuste<number>('localidadAlertas'));
         const registro = await navigator.serviceWorker.getRegistration();
-        const suscripcion = await registro?.pushManager.getSubscription();
-        return setEstado(suscripcion ? 'activo' : 'inactivo');
+        const suscripcion = Notification.permission === 'granted' ? await registro?.pushManager.getSubscription() : null;
+        if (suscripcion) return setEstado('activo');
+        if (await leerAjuste<boolean>(RECHAZO)) return setEstado('rechazado');
+        return setEstado(Notification.permission === 'denied' ? 'denegado' : 'inactivo');
     }, [soportado]);
 
     useEffect(() => { void actualizar(); }, [actualizar]);
@@ -34,7 +38,12 @@ export const usePush = () => {
         setError(null);
         try {
             const permiso = await Notification.requestPermission();
-            if (permiso !== 'granted') return setEstado('denegado');
+            // Cerrar el aviso del navegador o bloquearlo cuenta como "no": se recuerda.
+            if (permiso !== 'granted') {
+                await guardarAjuste(RECHAZO, true);
+                return setEstado('rechazado');
+            }
+            await borrarAjuste(RECHAZO);
             const registro = await navigator.serviceWorker.ready;
             const clave = await vecinoApi.clavePublicaPush();
             const suscripcion = await registro.pushManager.getSubscription()
@@ -58,11 +67,19 @@ export const usePush = () => {
                 await vecinoApi.eliminarSuscripcion(suscripcion.endpoint).catch(() => undefined);
                 await suscripcion.unsubscribe();
             }
-            setEstado('inactivo');
+            await guardarAjuste(RECHAZO, true);
+            setEstado('rechazado');
         } catch (causa) {
             setError(errorAmigable(causa, 'No pudimos desactivar las alertas.'));
         }
     };
 
-    return { estado, localidadId, error, activar, desactivar };
+    // Vuelve a mostrar la opción de activar. Si el navegador las bloqueó, hay que habilitarlas desde su configuración.
+    const volverAOfrecer = async () => {
+        setError(null);
+        await borrarAjuste(RECHAZO);
+        setEstado(Notification.permission === 'denied' ? 'denegado' : 'inactivo');
+    };
+
+    return { estado, localidadId, error, activar, desactivar, volverAOfrecer };
 };

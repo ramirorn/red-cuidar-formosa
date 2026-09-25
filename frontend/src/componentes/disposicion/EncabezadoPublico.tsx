@@ -22,7 +22,7 @@ export const EncabezadoPublico = () => {
                     <p className="flex items-center gap-2"><ShieldCheck className="size-4 text-verde-300" aria-hidden />Juntos contra el dengue en toda la provincia</p>
                     <div className="flex items-center gap-6">
                         <p className="flex items-center gap-2"><WifiOff className="size-4 text-verde-300" aria-hidden />Funciona sin internet</p>
-                        <p className="flex items-center gap-2"><Phone className="size-4 text-rojo-300" aria-hidden />Emergencias: <strong className="text-white">107</strong></p>
+                        <p className="flex items-center gap-2"><Phone className="size-4 text-rojo-300" aria-hidden />Emergencias: <a href="tel:107" className="font-extrabold text-white underline-offset-2 hover:underline">107</a></p>
                     </div>
                 </div>
             </div>

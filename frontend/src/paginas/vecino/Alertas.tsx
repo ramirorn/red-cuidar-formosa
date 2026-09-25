@@ -10,7 +10,7 @@ import { hace } from '@/lib/formato';
 import { abrirBase, type AlertaRecibida } from '@/sinConexion/bd';
 
 export default function Alertas() {
-    const { estado, localidadId, error, activar, desactivar } = usePush();
+    const { estado, localidadId, error, activar, desactivar, volverAOfrecer } = usePush();
     const { data: localidades = [] } = useLocalidades();
     const [elegida, setElegida] = useState<number | ''>('');
     const [procesando, setProcesando] = useState(false);
@@ -34,7 +34,26 @@ export default function Alertas() {
             <Tarjeta className="p-5">
                 {estado === 'cargando' && <p className="text-sm text-gris-texto">Revisando…</p>}
                 {estado === 'no-soportado' && <p className="text-sm text-tinta-suave">Tu navegador no admite notificaciones. Probá con Chrome o instalá la app en tu celular.</p>}
-                {estado === 'denegado' && <p className="text-sm text-rojo-700">Bloqueaste las notificaciones. Podés habilitarlas desde la configuración del navegador.</p>}
+                {estado === 'rechazado' && (
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-3">
+                            <BellOff className="size-7 text-gris-texto" aria-hidden />
+                            <div>
+                                <p className="font-extrabold">Elegiste no recibir alertas</p>
+                                <p className="text-sm text-tinta-suave">No te vamos a pedir permiso de nuevo.</p>
+                            </div>
+                        </div>
+                        <Boton variante="contorno" anchoCompleto onClick={() => void volverAOfrecer()} icono={<BellRing className="size-4" aria-hidden />}>
+                            Quiero recibir alertas
+                        </Boton>
+                    </div>
+                )}
+                {estado === 'denegado' && (
+                    <div className="space-y-2 text-sm">
+                        <p className="font-extrabold text-rojo-700">Las notificaciones están bloqueadas en este navegador.</p>
+                        <p className="text-tinta-suave">Para recibir alertas, tocá el candado junto a la dirección de la página, buscá <strong>Notificaciones</strong> y elegí <strong>Permitir</strong>. Después recargá la página.</p>
+                    </div>
+                )}
                 {(estado === 'inactivo' || estado === 'activo') && (
                     <div className="space-y-4">
                         <div className="flex items-center gap-3">
