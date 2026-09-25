@@ -1,8 +1,8 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { vecinoApi, type Recuadro } from '@/api/vecino.api';
-import { recuadroAlrededor, type Ubicacion } from '@/lib/geo';
+import type { Ubicacion } from '@/lib/geo';
 import { listarCola, listarPropios } from '@/sinConexion/cola';
-import { manzanasEnArea, obtenerManzanasDeLocalidad, ubicarEnManzana } from '@/sinConexion/manzanasLocales';
+import { obtenerManzanasDeLocalidad, ubicarEnManzana } from '@/sinConexion/manzanasLocales';
 import type { EstadoReporte, TipoReporte } from '@/tipos';
 import { CLAVES_VECINO } from './claves';
 
@@ -42,15 +42,12 @@ export const useMiManzana = (ubicacion: Ubicacion | null) => {
         staleTime: 60 * 1000,
     });
     const resultado = consulta.data;
-    const cercanas = ubicacion && resultado?.coleccion
-        ? manzanasEnArea(resultado.coleccion, recuadroAlrededor(ubicacion.latitud, ubicacion.longitud))
-        : [];
     return {
         ...consulta,
         manzana: resultado?.tipo === 'encontrada' ? resultado.manzana : null,
         fuera: resultado?.tipo === 'fuera',
         localidadId: resultado?.localidadId ?? null,
-        cercanas,
+        coleccion: resultado?.coleccion ?? null,
     };
 };
 

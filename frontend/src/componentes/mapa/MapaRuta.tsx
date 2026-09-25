@@ -2,6 +2,7 @@ import 'leaflet/dist/leaflet.css';
 import { useEffect, useMemo } from 'react';
 import { MapContainer, Marker, Polyline, TileLayer, Tooltip, useMap } from 'react-leaflet';
 import { divIcon, latLngBounds } from 'leaflet';
+import { cn } from '@/lib/utils';
 import type { ParadaRuta } from '@/tipos/panel';
 
 // Ícono numerado: verde si ya se visitó, rojo si es la próxima, blanco el resto.
@@ -38,7 +39,7 @@ export const MapaRuta = ({ paradas, seleccionadaId, alElegir, ubicacion, classNa
     const proxima = ordenadas.find((parada) => !parada.visitadaEn)?.id;
 
     return (
-        <MapContainer center={puntos[0] ?? [-26.1849, -58.1731]} zoom={15} className={className} attributionControl>
+        <MapContainer center={puntos[0] ?? [-26.1849, -58.1731]} zoom={15} className={cn('isolate', className)} attributionControl>
             <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" maxZoom={19} />
             <Encuadrar puntos={puntos} />
             <Polyline positions={puntos} pathOptions={{ color: '#187526', weight: 4, opacity: 0.75, dashArray: '8 8' }} />

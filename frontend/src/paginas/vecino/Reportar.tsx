@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router';
 import { Camera, Crop, Crosshair, LoaderCircle, MapPin, PackageOpen, Plus, Send, ShieldCheck, Sparkles, Trash2, TriangleAlert } from 'lucide-react';
-import { MapaManzanas } from '@/componentes/mapa/MapaManzanas';
+import { MapaMiManzana } from '@/componentes/mapa/MapaMiManzana';
 import { Boton, BotonEnlace } from '@/componentes/ui/Boton';
 import { ChipEstado } from '@/componentes/ui/ChipEstado';
 import { Tarjeta } from '@/componentes/ui/Tarjeta';
@@ -83,7 +83,7 @@ export default function Reportar() {
     // Tras enviar, el borrador se vacía: no hay que redirigir al escáner en ese momento.
     const [enviado, setEnviado] = useState(false);
     const [editando, setEditando] = useState<string | null>(null);
-    const { manzana, cercanas, fuera, isFetching: buscandoManzana, error: errorManzana } = useMiManzana(ubicacion);
+    const { manzana, coleccion, fuera, isFetching: buscandoManzana, error: errorManzana } = useMiManzana(ubicacion);
 
     const detectadas = useMemo(() => resumirDetecciones(borrador.fotos), [borrador.fotos]);
     const tipo: TipoReporte | null = borrador.tipo ?? (detectadas.length > 0 ? 'CRIADERO' : null);
@@ -216,13 +216,10 @@ export default function Reportar() {
             <Tarjeta className="overflow-hidden">
                 <div className="h-40 bg-gris-superficie">
                     {ubicacion && (
-                        <MapaManzanas
-                            centro={[ubicacion.latitud, ubicacion.longitud]}
-                            zoom={17}
-                            manzanas={cercanas}
-                            seleccionadaId={manzana?.id ?? null}
+                        <MapaMiManzana
+                            coleccion={coleccion}
                             ubicacion={[ubicacion.latitud, ubicacion.longitud]}
-                            interactivo={false}
+                            seleccionadaId={manzana?.id ?? null}
                             className="size-full"
                         />
                     )}

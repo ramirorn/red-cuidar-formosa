@@ -16,7 +16,7 @@ import {
     UserRoundX,
     WifiOff,
 } from 'lucide-react';
-import { MapaManzanas } from '@/componentes/mapa/MapaManzanas';
+import { MapaMiManzana } from '@/componentes/mapa/MapaMiManzana';
 import { Boton, BotonEnlace } from '@/componentes/ui/Boton';
 import { ChipEstado } from '@/componentes/ui/ChipEstado';
 import { Tarjeta } from '@/componentes/ui/Tarjeta';
@@ -91,7 +91,7 @@ const TuManzana = () => {
     const [ubicacion, setUbicacion] = useState<Ubicacion | null>(null);
     const [buscando, setBuscando] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const { manzana, cercanas, isFetching, fuera } = useMiManzana(ubicacion);
+    const { manzana, coleccion, isFetching, fuera } = useMiManzana(ubicacion);
 
     useEffect(() => {
         void leerAjuste<Ubicacion>('ultimaUbicacion').then((guardada) => guardada && setUbicacion(guardada));
@@ -123,12 +123,10 @@ const TuManzana = () => {
             {ubicacion ? (
                 <>
                     <div className="mx-5 mt-4 h-44 overflow-hidden rounded-2xl border border-gris-borde lg:h-80">
-                        <MapaManzanas
-                            centro={[ubicacion.latitud, ubicacion.longitud]}
-                            manzanas={cercanas}
-                            seleccionadaId={manzana?.id ?? null}
+                        <MapaMiManzana
+                            coleccion={coleccion}
                             ubicacion={[ubicacion.latitud, ubicacion.longitud]}
-                            interactivo={false}
+                            seleccionadaId={manzana?.id ?? null}
                             className="size-full"
                         />
                     </div>

@@ -1,6 +1,7 @@
 import 'leaflet/dist/leaflet.css';
 import { useEffect, useMemo, type ReactNode } from 'react';
 import { CircleMarker, GeoJSON, MapContainer, TileLayer, useMap, useMapEvents } from 'react-leaflet';
+import { cn } from '@/lib/utils';
 import type { LatLngBoundsExpression, PathOptions } from 'leaflet';
 import type { Recuadro } from '@/api/vecino.api';
 import { ESTADOS_MANZANA } from '@/componentes/ui/ChipEstado';
@@ -40,12 +41,6 @@ const Observador = ({ alMover }: { alMover: (recuadro: Recuadro | null, zoom: nu
     return null;
 };
 
-const Recentrar = ({ centro, zoom }: { centro: [number, number]; zoom: number }) => {
-    const mapa = useMap();
-    useEffect(() => { mapa.setView(centro, zoom); }, [mapa, centro, zoom]);
-    return null;
-};
-
 // Lleva el mapa a un punto cuando cambia el enfoque pedido (por ejemplo, al elegir una manzana de una lista).
 const Enfocar = ({ enfoque }: { enfoque: { centro: [number, number]; zoom: number } }) => {
     const mapa = useMap();
@@ -59,7 +54,6 @@ interface Propiedades {
     manzanas: FeatureManzana[];
     seleccionadaId?: number | null;
     ubicacion?: [number, number] | null;
-    interactivo?: boolean;
     alMover?: (recuadro: Recuadro | null, zoom: number) => void;
     alElegir?: (manzana: FeatureManzana) => void;
     className?: string;
@@ -70,7 +64,7 @@ interface Propiedades {
     enLienzo?: boolean;
 }
 
-export const MapaManzanas = ({ centro, zoom = 17, manzanas, seleccionadaId, ubicacion, interactivo = true, alMover, alElegir, className, enfoque, children, enLienzo = false }: Propiedades) => {
+export const MapaManzanas = ({ centro, zoom = 17, manzanas, seleccionadaId, ubicacion, alMover, alElegir, className, enfoque, children, enLienzo = false }: Propiedades) => {
     // GeoJSON de react-leaflet no se re-renderiza al cambiar datos: la clave fuerza el reemplazo.
     const clave = useMemo(() => manzanas.map((manzana) => `${manzana.id}:${manzana.properties.estado}`).join('|') + `#${seleccionadaId ?? ''}`, [manzanas, seleccionadaId]);
 
@@ -78,12 +72,7 @@ export const MapaManzanas = ({ centro, zoom = 17, manzanas, seleccionadaId, ubic
         <MapContainer
             center={centro}
             zoom={zoom}
-            className={className}
-            zoomControl={interactivo}
-            dragging={interactivo}
-            scrollWheelZoom={interactivo}
-            doubleClickZoom={interactivo}
-            touchZoom={interactivo}
+            className={cn('isolate', className)}
             attributionControl
             preferCanvas={enLienzo}
         >
@@ -92,7 +81,6 @@ export const MapaManzanas = ({ centro, zoom = 17, manzanas, seleccionadaId, ubic
                 url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
                 maxZoom={19}
             />
-            {!interactivo && <Recentrar centro={centro} zoom={zoom} />}
             {alMover && <Observador alMover={alMover} />}
             <GeoJSON
                 key={clave}
