@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { BellOff, BellRing, CloudRain, LoaderCircle } from 'lucide-react';
 import { Boton, BotonEnlace } from '@/componentes/ui/Boton';
+import { Desplegable } from '@/componentes/ui/Desplegable';
 import { Tarjeta } from '@/componentes/ui/Tarjeta';
 import { Manuscrita } from '@/componentes/ui/Tipografia';
 import { usePush } from '@/hooks/usePush';
@@ -42,11 +43,9 @@ export default function Alertas() {
                         </div>
                         <div>
                             <label htmlFor="localidad" className="text-sm font-extrabold">Tu localidad</label>
-                            <select id="localidad" value={elegida} onChange={(evento) => setElegida(Number(evento.target.value) || '')}
-                                className="mt-1 h-12 w-full rounded-2xl border border-gris-borde bg-white px-3 font-semibold focus:border-verde-500 focus:outline-none">
-                                <option value="">Elegí tu localidad</option>
-                                {localidades.map((localidad) => <option key={localidad.id} value={localidad.id}>{localidad.nombre}</option>)}
-                            </select>
+                            <Desplegable id="localidad" tamano="grande" className="mt-1" valor={elegida === '' ? '' : String(elegida)} textoVacio="Elegí tu localidad"
+                                alCambiar={(valor) => setElegida(Number(valor) || '')}
+                                opciones={localidades.map((localidad) => ({ valor: String(localidad.id), etiqueta: localidad.nombre }))} />
                         </div>
                         {estado === 'inactivo' || elegida !== localidadId ? (
                             <Boton anchoCompleto disabled={!elegida || procesando} onClick={conProceso(() => activar(Number(elegida)))}

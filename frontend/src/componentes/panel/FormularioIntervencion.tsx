@@ -11,7 +11,8 @@ import { ahoraLocal } from '@/lib/fechas';
 import { TIPOS_INTERVENCION, UNIDADES } from '@/lib/etiquetasPanel';
 import { cn } from '@/lib/utils';
 import type { TipoIntervencion, UnidadProducto } from '@/tipos/panel';
-import { AreaTexto, Campo, Entrada, Selector } from './Campos';
+import { Desplegable } from '@/componentes/ui/Desplegable';
+import { AreaTexto, Campo, Entrada } from './Campos';
 
 const ICONOS: Record<TipoIntervencion, typeof Bug> = {
     APLICACION_BTI: Bug,
@@ -119,9 +120,10 @@ export const FormularioIntervencion = ({ manzana, reporteId, paradaRutaId, ubica
                     </Campo>
                     <Campo etiqueta="Unidad" error={errors.unidadProducto?.message}>
                         {(props) => (
-                            <Selector {...props} {...register('unidadProducto')}>
-                                {UNIDADES_LISTA.map((unidad) => <option key={unidad} value={unidad}>{UNIDADES[unidad]}</option>)}
-                            </Selector>
+                            <Controller control={control} name="unidadProducto" render={({ field }) => (
+                                <Desplegable {...props} valor={field.value ?? ''} alCambiar={field.onChange}
+                                    opciones={UNIDADES_LISTA.map((unidad) => ({ valor: unidad, etiqueta: UNIDADES[unidad] }))} />
+                            )} />
                         )}
                     </Campo>
                     <Campo etiqueta="Cuerpo de agua (opcional)" error={errors.tipoCuerpoAgua?.message} className="col-span-2">

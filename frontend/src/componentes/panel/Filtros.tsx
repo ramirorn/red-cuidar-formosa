@@ -2,7 +2,8 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { useUsuarioPanel } from '@/autenticacion/SesionPanel';
 import { useLocalidadesPanel } from '@/hooks/usePanel';
 import type { RangoFechas } from '@/tipos/panel';
-import { Filtro, Selector } from './Campos';
+import { Desplegable } from '@/componentes/ui/Desplegable';
+import { Filtro } from './Campos';
 
 export const PERIODOS = [
     { dias: 7, etiqueta: 'Últimos 7 días' },
@@ -26,9 +27,8 @@ export const usePeriodo = (diasIniciales = 30) => {
 export const SelectorPeriodo = ({ dias, alCambiar }: { dias: number; alCambiar: (dias: number) => void }) => (
     <Filtro etiqueta="Período">
         {(id) => (
-            <Selector id={id} value={dias} onChange={(evento) => alCambiar(Number(evento.target.value))}>
-                {PERIODOS.map(({ dias: valor, etiqueta }) => <option key={valor} value={valor}>{etiqueta}</option>)}
-            </Selector>
+            <Desplegable id={id} valor={String(dias)} alCambiar={(valor) => alCambiar(Number(valor))}
+                opciones={PERIODOS.map(({ dias: valor, etiqueta }) => ({ valor: String(valor), etiqueta }))} />
         )}
     </Filtro>
 );
@@ -41,7 +41,7 @@ export const SelectorLocalidad = ({ valor, alCambiar, todas = 'Toda la provincia
     if (!esProvincial) {
         return (
             <Filtro etiqueta="Localidad">
-                {(id) => <Selector id={id} disabled value=""><option value="">{usuario.localidad?.nombre ?? 'Tu localidad'}</option></Selector>}
+                {(id) => <Desplegable id={id} disabled valor="" alCambiar={() => undefined} opciones={[{ valor: '', etiqueta: usuario.localidad?.nombre ?? 'Tu localidad' }]} />}
             </Filtro>
         );
     }
@@ -49,10 +49,8 @@ export const SelectorLocalidad = ({ valor, alCambiar, todas = 'Toda la provincia
     return (
         <Filtro etiqueta="Localidad">
             {(id) => (
-                <Selector id={id} value={valor ?? ''} onChange={(evento) => alCambiar(evento.target.value ? Number(evento.target.value) : undefined)}>
-                    <option value="">{todas}</option>
-                    {localidades.map((localidad) => <option key={localidad.id} value={localidad.id}>{localidad.nombre}</option>)}
-                </Selector>
+                <Desplegable id={id} valor={valor ? String(valor) : ''} alCambiar={(nuevo) => alCambiar(nuevo ? Number(nuevo) : undefined)}
+                    opciones={[{ valor: '', etiqueta: todas }, ...localidades.map((localidad) => ({ valor: String(localidad.id), etiqueta: localidad.nombre }))]} />
             )}
         </Filtro>
     );

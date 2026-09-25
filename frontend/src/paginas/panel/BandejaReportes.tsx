@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { Bot, ChevronRight, Image, MessageCircle, Smartphone } from 'lucide-react';
 import { EncabezadoPagina } from '@/componentes/panel/Encabezado';
-import { Filtro, Selector } from '@/componentes/panel/Campos';
+import { Filtro } from '@/componentes/panel/Campos';
+import { Desplegable } from '@/componentes/ui/Desplegable';
 import { ChipReporte, ConfianzaIa } from '@/componentes/panel/Chips';
 import { CargarMas, EsqueletoFilas, ErrorCarga, EstadoVacio } from '@/componentes/panel/Estados';
 import { BarraFiltros, SelectorLocalidad } from '@/componentes/panel/Filtros';
@@ -76,27 +77,21 @@ export default function BandejaReportes() {
             <BarraFiltros>
                 <Filtro etiqueta="Estado">
                     {(id) => (
-                        <Selector id={id} value={filtros.estado ?? ''} onChange={(evento) => cambiar('estado', evento.target.value)}>
-                            <option value="">Todos</option>
-                            {ESTADOS.map((estado) => <option key={estado} value={estado}>{ESTADOS_REPORTE_PANEL[estado]}</option>)}
-                        </Selector>
+                        <Desplegable id={id} valor={filtros.estado ?? ''} alCambiar={(valor) => cambiar('estado', valor)}
+                            opciones={[{ valor: '', etiqueta: 'Todos' }, ...ESTADOS.map((estado) => ({ valor: estado, etiqueta: ESTADOS_REPORTE_PANEL[estado] }))]} />
                     )}
                 </Filtro>
                 <Filtro etiqueta="Tipo">
                     {(id) => (
-                        <Selector id={id} value={filtros.tipo ?? ''} onChange={(evento) => cambiar('tipo', evento.target.value)}>
-                            <option value="">Todos</option>
-                            {TIPOS.map((tipo) => <option key={tipo} value={tipo}>{TIPOS_REPORTE[tipo]}</option>)}
-                        </Selector>
+                        <Desplegable id={id} valor={filtros.tipo ?? ''} alCambiar={(valor) => cambiar('tipo', valor)}
+                            opciones={[{ valor: '', etiqueta: 'Todos' }, ...TIPOS.map((tipo) => ({ valor: tipo, etiqueta: TIPOS_REPORTE[tipo] }))]} />
                     )}
                 </Filtro>
                 <SelectorLocalidad valor={filtros.localidadId} alCambiar={(valor) => cambiar('localidadId', valor ? String(valor) : undefined)} />
                 <Filtro etiqueta="Orden">
                     {(id) => (
-                        <Selector id={id} value={filtros.orden} onChange={(evento) => cambiar('orden', evento.target.value)}>
-                            <option value="recientes">Más recientes</option>
-                            <option value="prioridad">Prioridad de la IA</option>
-                        </Selector>
+                        <Desplegable id={id} valor={filtros.orden ?? 'recientes'} alCambiar={(valor) => cambiar('orden', valor)}
+                            opciones={[{ valor: 'recientes', etiqueta: 'Más recientes' }, { valor: 'prioridad', etiqueta: 'Prioridad de la IA', descripcion: 'Mayor confianza de la IA primero' }]} />
                     )}
                 </Filtro>
                 <p className="ml-auto self-center text-xs font-bold text-gris-texto" aria-live="polite">

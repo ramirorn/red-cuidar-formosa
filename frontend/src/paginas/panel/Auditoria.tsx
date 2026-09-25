@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ScrollText } from 'lucide-react';
-import { Filtro, Selector } from '@/componentes/panel/Campos';
+import { Filtro } from '@/componentes/panel/Campos';
+import { Desplegable } from '@/componentes/ui/Desplegable';
 import { EncabezadoPagina } from '@/componentes/panel/Encabezado';
 import { CargarMas, EsqueletoFilas, ErrorCarga, EstadoVacio } from '@/componentes/panel/Estados';
 import { BarraFiltros, SelectorPeriodo, usePeriodo } from '@/componentes/panel/Filtros';
@@ -36,10 +37,8 @@ export default function Auditoria() {
                 <SelectorPeriodo dias={dias} alCambiar={setDias} />
                 <Filtro etiqueta="Acción">
                     {(id) => (
-                        <Selector id={id} value={accion ?? ''} onChange={(evento) => setAccion(evento.target.value || undefined)}>
-                            <option value="">Todas</option>
-                            {Object.entries(ACCIONES_AUDITORIA).map(([valor, texto]) => <option key={valor} value={valor}>{texto}</option>)}
-                        </Selector>
+                        <Desplegable id={id} valor={accion ?? ''} alCambiar={(valor) => setAccion(valor || undefined)}
+                            opciones={[{ valor: '', etiqueta: 'Todas' }, ...Object.entries(ACCIONES_AUDITORIA).map(([valor, etiqueta]) => ({ valor, etiqueta }))]} />
                     )}
                 </Filtro>
             </BarraFiltros>

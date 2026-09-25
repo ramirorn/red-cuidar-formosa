@@ -4,7 +4,8 @@ import { MapPinned, Plus, Syringe } from 'lucide-react';
 import type { Recuadro } from '@/api/vecino.api';
 import { useUsuarioPanel } from '@/autenticacion/SesionPanel';
 import { MapaManzanas, ZOOM_MINIMO_MANZANAS } from '@/componentes/mapa/MapaManzanas';
-import { Filtro, Selector } from '@/componentes/panel/Campos';
+import { Filtro } from '@/componentes/panel/Campos';
+import { Desplegable } from '@/componentes/ui/Desplegable';
 import { Dialogo } from '@/componentes/panel/Dialogo';
 import { EncabezadoPagina } from '@/componentes/panel/Encabezado';
 import { CargarMas, EsqueletoFilas, ErrorCarga, EstadoVacio } from '@/componentes/panel/Estados';
@@ -92,10 +93,8 @@ export default function Intervenciones() {
                 <SelectorPeriodo dias={dias} alCambiar={setDias} />
                 <Filtro etiqueta="Tipo">
                     {(id) => (
-                        <Selector id={id} value={tipo ?? ''} onChange={(evento) => setTipo((evento.target.value || undefined) as TipoIntervencion | undefined)}>
-                            <option value="">Todos</option>
-                            {TIPOS.map((valor) => <option key={valor} value={valor}>{TIPOS_INTERVENCION[valor]}</option>)}
-                        </Selector>
+                        <Desplegable id={id} valor={tipo ?? ''} alCambiar={(valor) => setTipo((valor || undefined) as TipoIntervencion | undefined)}
+                            opciones={[{ valor: '', etiqueta: 'Todos' }, ...TIPOS.map((valor) => ({ valor, etiqueta: TIPOS_INTERVENCION[valor] }))]} />
                     )}
                 </Filtro>
                 <SelectorLocalidad valor={localidadId} alCambiar={setLocalidadId} />

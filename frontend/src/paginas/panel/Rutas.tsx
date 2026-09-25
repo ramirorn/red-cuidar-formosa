@@ -3,7 +3,8 @@ import { Link, useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { ChevronRight, LoaderCircle, Plus, Route, Sparkles } from 'lucide-react';
 import { useUsuarioPanel } from '@/autenticacion/SesionPanel';
-import { Campo, Filtro, Selector } from '@/componentes/panel/Campos';
+import { Campo, Filtro } from '@/componentes/panel/Campos';
+import { Desplegable } from '@/componentes/ui/Desplegable';
 import { ChipRuta } from '@/componentes/panel/Chips';
 import { Dialogo } from '@/componentes/panel/Dialogo';
 import { EncabezadoPagina } from '@/componentes/panel/Encabezado';
@@ -64,19 +65,16 @@ const GenerarRuta = ({ alTerminar }: { alTerminar: (id: number) => void }) => {
             {esProvincial && (
                 <Campo etiqueta="Localidad" ayuda="Las rutas se arman dentro de una localidad.">
                     {(props) => (
-                        <Selector {...props} value={localidadId ?? ''} required onChange={(evento) => { setLocalidadId(evento.target.value ? Number(evento.target.value) : undefined); setBrigadistaId(undefined); }}>
-                            <option value="">Elegí una localidad</option>
-                            {localidades.map((localidad) => <option key={localidad.id} value={localidad.id}>{localidad.nombre}</option>)}
-                        </Selector>
+                        <Desplegable {...props} valor={localidadId ? String(localidadId) : ''} textoVacio="Elegí una localidad"
+                            alCambiar={(valor) => { setLocalidadId(valor ? Number(valor) : undefined); setBrigadistaId(undefined); }}
+                            opciones={localidades.map((localidad) => ({ valor: String(localidad.id), etiqueta: localidad.nombre }))} />
                     )}
                 </Campo>
             )}
             <Campo etiqueta="Brigadista" ayuda={brigadistas.length === 0 && !cargandoBrigadistas ? 'No hay brigadistas activos en esta localidad: la ruta queda sin asignar.' : 'Solo la persona asignada ve la ruta en su vista de campo.'}>
                 {(props) => (
-                    <Selector {...props} value={brigadistaId ?? ''} onChange={(evento) => setBrigadistaId(evento.target.value ? Number(evento.target.value) : undefined)}>
-                        <option value="">Sin asignar por ahora</option>
-                        {brigadistas.map((brigadista) => <option key={brigadista.id} value={brigadista.id}>{nombreCompleto(brigadista)}</option>)}
-                    </Selector>
+                    <Desplegable {...props} valor={brigadistaId ? String(brigadistaId) : ''} alCambiar={(valor) => setBrigadistaId(valor ? Number(valor) : undefined)}
+                        opciones={[{ valor: '', etiqueta: 'Sin asignar por ahora' }, ...brigadistas.map((brigadista) => ({ valor: String(brigadista.id), etiqueta: nombreCompleto(brigadista) }))]} />
                 )}
             </Campo>
             <Campo etiqueta={`Cantidad máxima de paradas: ${maxParadas}`}>
@@ -115,10 +113,8 @@ export default function Rutas() {
                 <Filtro etiqueta="Fecha" className="min-w-52">{(id) => <SelectorFecha id={id} valor={fecha} alCambiar={setFecha} opcional textoVacio="Todas las fechas" />}</Filtro>
                 <Filtro etiqueta="Estado">
                     {(id) => (
-                        <Selector id={id} value={estado ?? ''} onChange={(evento) => setEstado((evento.target.value || undefined) as EstadoRuta | undefined)}>
-                            <option value="">Todos</option>
-                            {ESTADOS.map((valor) => <option key={valor} value={valor}>{ESTADOS_RUTA[valor].etiqueta}</option>)}
-                        </Selector>
+                        <Desplegable id={id} valor={estado ?? ''} alCambiar={(valor) => setEstado((valor || undefined) as EstadoRuta | undefined)}
+                            opciones={[{ valor: '', etiqueta: 'Todos' }, ...ESTADOS.map((valor) => ({ valor, etiqueta: ESTADOS_RUTA[valor].etiqueta }))]} />
                     )}
                 </Filtro>
                 <SelectorLocalidad valor={localidadId} alCambiar={setLocalidadId} />

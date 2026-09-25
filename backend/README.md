@@ -41,6 +41,18 @@ docker compose exec api npm run semilla   # localidades, primer administrador y 
   (borra los datos). Usar claves con letras, números, `-` o `_`: van dentro de la URL de conexión.
 - La base no publica puertos: `docker compose exec db psql -U postgres -d red_cuidar`.
 
+Actualizar después de un `git pull`:
+
+```bash
+docker compose up -d --build   # reconstruye solo lo que cambió (usa la caché de Docker)
+```
+
+- Cambios en `api/src`, `motor-predictivo/app`, `frontend/src` o `frontend/public`: se ven al instante, sin reconstruir.
+- Hay que reconstruir con `--build` cuando cambian dependencias (`package.json`, `requirements.txt`), un `Dockerfile`,
+  el esquema o las migraciones de Prisma (`api/prisma`) o la configuración del frontend (`vite.config.ts`, `index.html`).
+  Las migraciones nuevas se aplican solas al arrancar la API.
+- Si cambian las variables de `.env`: `docker compose up -d` (recrea los contenedores afectados).
+
 Pruebas:
 
 ```bash

@@ -1,12 +1,13 @@
-import { useState, type SelectHTMLAttributes } from 'react';
-import { useForm, useWatch } from 'react-hook-form';
+import { useState } from 'react';
+import { Controller, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
 import * as Interruptor from '@radix-ui/react-switch';
 import { Copy, KeyRound, LoaderCircle, Pencil, Plus, UserRound } from 'lucide-react';
 import { useUsuarioPanel } from '@/autenticacion/SesionPanel';
-import { Campo, Entrada, Filtro, Selector } from '@/componentes/panel/Campos';
+import { Campo, Entrada, Filtro } from '@/componentes/panel/Campos';
+import { Desplegable } from '@/componentes/ui/Desplegable';
 import { Dialogo } from '@/componentes/panel/Dialogo';
 import { EncabezadoPagina } from '@/componentes/panel/Encabezado';
 import { CargarMas, EsqueletoFilas, ErrorCarga, EstadoVacio } from '@/componentes/panel/Estados';
@@ -49,15 +50,25 @@ const esquemaNuevo = z.object({
 
 type DatosNuevo = z.infer<typeof esquemaNuevo>;
 
-const SelectorLocalidadCampo = ({ rol, ...props }: { rol: Rol } & SelectHTMLAttributes<HTMLSelectElement>) => {
+interface PropiedadesCampoLocalidad {
+    rol: Rol;
+    valor: string;
+    alCambiar: (valor: string) => void;
+    id?: string;
+    'aria-invalid'?: boolean;
+    'aria-describedby'?: string;
+}
+
+const SelectorLocalidadCampo = ({ rol, valor, alCambiar, ...accesibles }: PropiedadesCampoLocalidad) => {
     const { data: localidades = [] } = useLocalidadesPanel();
     return (
-        <Selector {...props} disabled={esProvincial(rol)}>
-            <option value="">{esProvincial(rol) ? 'Toda la provincia' : 'Elegí una localidad'}</option>
-            {localidades.map((localidad) => <option key={localidad.id} value={localidad.id}>{localidad.nombre}</option>)}
-        </Selector>
+        <Desplegable {...accesibles} disabled={esProvincial(rol)} valor={esProvincial(rol) ? '' : valor} alCambiar={alCambiar}
+            textoVacio={esProvincial(rol) ? 'Toda la provincia' : 'Elegí una localidad'}
+            opciones={localidades.map((localidad) => ({ valor: String(localidad.id), etiqueta: localidad.nombre }))} />
     );
 };
+
+const OPCIONES_ROL = LISTA_ROLES.map((valor) => ({ valor, etiqueta: ROLES[valor].etiqueta, descripcion: ROLES[valor].descripcion }));
 
 const CrearUsuario = ({ alTerminar }: { alTerminar: () => void }) => {
     const crear = useCrearUsuario();
@@ -110,13 +121,18 @@ const CrearUsuario = ({ alTerminar }: { alTerminar: () => void }) => {
             <Campo etiqueta="Email" error={errors.email?.message}>{(props) => <Entrada {...props} {...register('email')} type="email" autoComplete="off" />}</Campo>
             <Campo etiqueta="Rol" ayuda={ROLES[rol].descripcion} error={errors.rol?.message}>
                 {(props) => (
-                    <Selector {...props} {...register('rol', { onChange: (evento) => { if (esProvincial(evento.target.value as Rol)) setValue('localidadId', ''); } })}>
-                        {LISTA_ROLES.map((valor) => <option key={valor} value={valor}>{ROLES[valor].etiqueta}</option>)}
-                    </Selector>
+                    <Controller control={control} name="rol" render={({ field }) => (
+                        <Desplegable {...props} valor={field.value} opciones={OPCIONES_ROL}
+                            alCambiar={(valor) => { field.onChange(valor); if (esProvincial(valor as Rol)) setValue('localidadId', ''); }} />
+                    )} />
                 )}
             </Campo>
             <Campo etiqueta="Localidad" error={errors.localidadId?.message}>
-                {(props) => <SelectorLocalidadCampo {...props} {...register('localidadId')} rol={rol} />}
+                {(props) => (
+                    <Controller control={control} name="localidadId" render={({ field }) => (
+                        <SelectorLocalidadCampo {...props} rol={rol} valor={field.value ?? ''} alCambiar={field.onChange} />
+                    )} />
+                )}
             </Campo>
             <Campo etiqueta="Contraseña inicial" error={errors.password?.message} ayuda="Generada al azar. Podés cambiarla.">
                 {(props) => (
@@ -157,13 +173,12 @@ const EditarUsuario = ({ usuario, alTerminar }: { usuario: UsuarioInstitucional;
         <form onSubmit={(evento) => { evento.preventDefault(); void guardar(); }} className="space-y-4">
             <Campo etiqueta="Rol" ayuda={ROLES[rol].descripcion}>
                 {(props) => (
-                    <Selector {...props} value={rol} disabled={esYo} onChange={(evento) => { const nuevo = evento.target.value as Rol; setRol(nuevo); if (esProvincial(nuevo)) setLocalidadId(''); }}>
-                        {LISTA_ROLES.map((valor) => <option key={valor} value={valor}>{ROLES[valor].etiqueta}</option>)}
-                    </Selector>
+                    <Desplegable {...props} valor={rol} disabled={esYo} opciones={OPCIONES_ROL}
+                        alCambiar={(valor) => { const nuevo = valor as Rol; setRol(nuevo); if (esProvincial(nuevo)) setLocalidadId(''); }} />
                 )}
             </Campo>
             <Campo etiqueta="Localidad" error={faltaLocalidad ? 'Este rol trabaja en una localidad: elegila' : undefined}>
-                {(props) => <SelectorLocalidadCampo {...props} rol={rol} value={localidadId} onChange={(evento) => setLocalidadId(evento.target.value)} />}
+                {(props) => <SelectorLocalidadCampo {...props} rol={rol} valor={localidadId} alCambiar={setLocalidadId} />}
             </Campo>
             <p className="rounded-xl bg-amber-50 p-3 text-xs font-bold text-amber-800">
                 {esYo ? 'No podés cambiar tu propio rol.' : 'Al cambiar el rol o la localidad se cierran sus sesiones abiertas.'}
@@ -202,10 +217,8 @@ export default function Usuarios() {
             <BarraFiltros>
                 <Filtro etiqueta="Rol">
                     {(id) => (
-                        <Selector id={id} value={rol ?? ''} onChange={(evento) => setRol((evento.target.value || undefined) as Rol | undefined)}>
-                            <option value="">Todos</option>
-                            {LISTA_ROLES.map((valor) => <option key={valor} value={valor}>{ROLES[valor].etiqueta}</option>)}
-                        </Selector>
+                        <Desplegable id={id} valor={rol ?? ''} alCambiar={(valor) => setRol((valor || undefined) as Rol | undefined)}
+                            opciones={[{ valor: '', etiqueta: 'Todos' }, ...LISTA_ROLES.map((valor) => ({ valor, etiqueta: ROLES[valor].etiqueta }))]} />
                     )}
                 </Filtro>
                 <SelectorLocalidad valor={localidadId} alCambiar={setLocalidadId} todas="Todas" />

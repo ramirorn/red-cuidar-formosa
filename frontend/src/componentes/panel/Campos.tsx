@@ -1,4 +1,4 @@
-import { forwardRef, useId, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
+import { forwardRef, useId, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from 'react';
 import { cn } from '@/lib/utils';
 
 const CLASES_CONTROL = cn(
@@ -36,11 +36,6 @@ export const Entrada = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInpu
     <input ref={ref} className={cn(CLASES_CONTROL, 'h-11', className)} {...resto} />
 ));
 Entrada.displayName = 'Entrada';
-
-export const Selector = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSelectElement>>(({ className, ...resto }, ref) => (
-    <select ref={ref} className={cn(CLASES_CONTROL, 'h-11 cursor-pointer pr-8', className)} {...resto} />
-));
-Selector.displayName = 'Selector';
 
 export const AreaTexto = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement>>(({ className, ...resto }, ref) => (
     <textarea ref={ref} className={cn(CLASES_CONTROL, 'min-h-24 py-3 leading-relaxed', className)} {...resto} />

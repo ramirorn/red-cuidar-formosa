@@ -5,7 +5,8 @@ import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 const CODIGO_PANEL = /\/src\/(paginas\/panel|componentes\/panel|autenticacion)\//;
-const LIBRERIAS_PANEL = /node_modules\/(zod|react-hook-form|@hookform|@radix-ui)\//;
+// Radix no va: el desplegable también lo usa la PWA del vecino, que tiene que funcionar sin conexión.
+const LIBRERIAS_PANEL = /node_modules\/(zod|react-hook-form|@hookform)\//;
 
 const esDelPanel = (modulos: string[]) =>
     modulos.some((modulo) => CODIGO_PANEL.test(modulo)) || (modulos.length > 0 && modulos.every((modulo) => LIBRERIAS_PANEL.test(modulo)));
