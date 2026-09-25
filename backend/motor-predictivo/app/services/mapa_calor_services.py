@@ -63,7 +63,7 @@ def redondear_a_ventana(fecha: datetime, hacia_arriba: bool = False) -> datetime
 
 
 # Una sola consulta agregada para todas las manzanas del área (sin consultas N+1).
-# Aprovecha los índices (manzanaId, capturadoEn) de reporte y (localidadId, estado) de manzana.
+# Aprovecha los índices reporte(createdAt, id) para el rango de fechas y manzana(localidadId, estado).
 CONSULTA_MAPA_CALOR = """
     WITH lluvia AS (
         SELECT "localidadId", SUM("precipitacionMm") AS mm

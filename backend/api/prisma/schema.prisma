@@ -395,6 +395,9 @@ model intervencion {
 
   @@index([manzanaId, realizadaEn])
   @@index([tipo, realizadaEn])
+  // Paginación keyset del listado y la exportación.
+  @@index([realizadaEn, id])
+  @@index([paradaRutaId])
   @@index([ubicacion], type: Gist)
 }
 
@@ -429,6 +432,8 @@ model paradaRuta {
   intervenciones intervencion[]
 
   @@unique([rutaId, orden])
+  // Exclusión de manzanas ya asignadas al generar rutas.
+  @@index([manzanaId])
 }
 
 // ---------------------------------------------------------------------------
@@ -462,4 +467,6 @@ model prediccionRiesgo {
   manzana manzana @relation(fields: [manzanaId], references: [id], onDelete: Cascade)
 
   @@index([manzanaId, calculadoEn])
+  @@index([vigenteHasta])
+  @@index([calculadoEn])
 }
