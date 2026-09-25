@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { gunzipSync, gzipSync } from "node:zlib";
-import type { PrismaClient } from "@prisma/client";
+import { Prisma, type PrismaClient } from "@prisma/client";
 
 // Manzanas y zonas de la Copa a partir de OpenStreetMap.
 // OSM no tiene manzanas dibujadas: se arman con las calles (cada polígono cerrado por calles es una
@@ -115,7 +115,8 @@ export const nombreDeBarrio = (nombre: string) => nombre.replace(/^\s*(barrio|b[
 
 interface Separado {
     calles: object[];
-    agua: object[];
+    // Cada área de agua (laguna, riacho) con sus líneas: se arma por separado.
+    agua: { lineas: object[] }[];
     areasBarrio: { nombre: string; lineas: object[] }[];
     puntosBarrio: { nombre: string; lon: number; lat: number }[];
 }
@@ -130,7 +131,7 @@ const separar = ({ elements }: RespuestaOverpass): Separado => {
         }
         if (elemento.type === "way" && elemento.geometry && elemento.geometry.length >= 2) {
             if (esBarrio(tags) && cerrada(elemento.geometry)) resultado.areasBarrio.push({ nombre: nombreDeBarrio(tags.name!), lineas: [linea(elemento.geometry)] });
-            else if (esAgua(tags) && cerrada(elemento.geometry)) resultado.agua.push(linea(elemento.geometry));
+            else if (esAgua(tags) && cerrada(elemento.geometry)) resultado.agua.push({ lineas: [linea(elemento.geometry)] });
             else if (tags.highway || tags.railway || tags.waterway) resultado.calles.push(linea(elemento.geometry));
             continue;
         }
@@ -138,7 +139,7 @@ const separar = ({ elements }: RespuestaOverpass): Separado => {
             const lineas = elemento.members.filter((m) => m.type === "way" && m.role !== "inner" && m.geometry && m.geometry.length >= 2).map((m) => linea(m.geometry!));
             if (lineas.length === 0) continue;
             if (esBarrio(tags)) resultado.areasBarrio.push({ nombre: nombreDeBarrio(tags.name!), lineas });
-            else if (esAgua(tags)) resultado.agua.push(...lineas);
+            else if (esAgua(tags)) resultado.agua.push({ lineas });
         }
     }
     return resultado;
@@ -284,10 +285,29 @@ export const cargarDesdeOsm = async (prisma: PrismaClient, localidadId: number, 
             CREATE TEMP TABLE osm_lineas ON COMMIT DROP AS
             SELECT ST_Transform(ST_SetSRID(ST_GeomFromGeoJSON(f->>'geometry'), 4326), ${SRID_METRICO}::int) AS geom
             FROM json_array_elements(${coleccion(calles)}::json->'features') f`;
-        await tx.$executeRaw`
-            CREATE TEMP TABLE osm_agua ON COMMIT DROP AS
-            SELECT ST_BuildArea(ST_Collect(ST_Transform(ST_SetSRID(ST_GeomFromGeoJSON(f->>'geometry'), 4326), ${SRID_METRICO}::int))) AS geom
-            FROM json_array_elements(${coleccion(agua)}::json->'features') f`;
+        // Agua y barrios se arman de a una área: en OSM hay polígonos mal cerrados que harían fallar todo
+        // el lote. Cada uno va en un punto de guardado; si falla, se omite ese solo.
+        const armarAreas = async (tabla: 'osm_agua' | 'osm_barrios', areas: { nombre?: string; lineas: object[] }[]) => {
+            await tx.$executeRawUnsafe(`CREATE TEMP TABLE ${tabla} (nombre text, geom geometry) ON COMMIT DROP`);
+            let omitidas = 0;
+            for (const area of areas) {
+                await tx.$executeRawUnsafe('SAVEPOINT area_osm');
+                try {
+                    const lineas = coleccion(area.lineas);
+                    const geom = Prisma.sql`ST_CollectionExtract(ST_MakeValid(ST_BuildArea(ST_Node(ST_Collect(
+                        ST_Transform(ST_SetSRID(ST_GeomFromGeoJSON(f->>'geometry'), 4326), ${SRID_METRICO}::int))))), 3)`;
+                    await tx.$executeRaw`INSERT INTO ${Prisma.raw(tabla)} (nombre, geom)
+                        SELECT ${area.nombre ?? null}, ${geom} FROM json_array_elements(${lineas}::json->'features') f HAVING count(*) > 0`;
+                    await tx.$executeRawUnsafe('RELEASE SAVEPOINT area_osm');
+                } catch {
+                    await tx.$executeRawUnsafe('ROLLBACK TO SAVEPOINT area_osm');
+                    omitidas++;
+                }
+            }
+            if (omitidas > 0) console.warn(`  ${omitidas} áreas de ${tabla === 'osm_agua' ? 'agua' : 'barrio'} con geometría inválida en OSM: se omiten`);
+        };
+        await armarAreas('osm_agua', agua);
+
         await tx.$executeRaw`
             CREATE TEMP TABLE osm_bloques ON COMMIT DROP AS
             WITH calles AS (SELECT ST_Buffer(ST_Collect(geom), ${RETIRO_CALLE_M}::float8, 'quad_segs=2') AS geom FROM osm_lineas),
@@ -307,12 +327,7 @@ export const cargarDesdeOsm = async (prisma: PrismaClient, localidadId: number, 
             WHERE NOT ST_IsEmpty(geom) AND GeometryType(geom) = 'POLYGON'`;
 
         // 2. Barrio de cada manzana: el área de barrio que la contiene o, si OSM solo tiene el punto, el más cercano (a menos de 1,5 km).
-        await tx.$executeRaw`
-            CREATE TEMP TABLE osm_barrios ON COMMIT DROP AS
-            SELECT b.valor->>'nombre' AS nombre,
-                   ST_BuildArea(ST_Node(ST_Collect(ST_Transform(ST_SetSRID(ST_GeomFromGeoJSON(l.value::text), 4326), ${SRID_METRICO}::int)))) AS geom
-            FROM json_array_elements(${JSON.stringify(areasBarrio)}::json) WITH ORDINALITY AS b(valor, n), json_array_elements(b.valor->'lineas') l
-            GROUP BY b.n, b.valor->>'nombre'`;
+        await armarAreas('osm_barrios', areasBarrio);
         const planas = await tx.$queryRaw<ManzanaPlana[]>`
             WITH m AS (SELECT "id", ST_Transform("centroide", ${SRID_METRICO}::int) AS c FROM "manzana" WHERE "localidadId" = ${localidadId}),
                  puntos AS (
