@@ -61,8 +61,9 @@ const TarjetaUsuario = () => {
     );
 };
 
+// El logo lleva a la página principal del sitio (la sesión del panel sigue abierta); el inicio del panel es "Resumen".
 const Logo = () => (
-    <Link to="/panel" aria-label="Panel de Red-Cuidar Formosa" className="flex items-center gap-2">
+    <Link to="/" aria-label="Red-Cuidar Formosa, ir a la página principal" className="flex items-center gap-2">
         <img src="/marca/logo-horizontal.webp" alt="Red-Cuidar Formosa" width="529" height="234" className="h-11 w-auto" />
     </Link>
 );

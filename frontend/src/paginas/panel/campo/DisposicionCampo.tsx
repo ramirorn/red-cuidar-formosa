@@ -17,8 +17,8 @@ const Barra = ({ volverA, textoVolver }: { volverA?: string; textoVolver?: strin
         <>
             <header className="sticky top-0 z-[500] border-b border-gris-borde bg-white/95 pt-[env(safe-area-inset-top)] backdrop-blur">
                 <div className="mx-auto flex h-14 max-w-2xl items-center justify-between gap-3 px-4">
-                    {/* El logo lleva al inicio del panel (al brigadista, su vista de campo). */}
-                    <Link to="/panel" aria-label="Red-Cuidar Formosa, ir al inicio">
+                    {/* El logo lleva a la página principal del sitio, como en el resto de la app. */}
+                    <Link to="/" aria-label="Red-Cuidar Formosa, ir a la página principal">
                         <img src="/marca/logo-horizontal.webp" alt="Red-Cuidar Formosa" width="529" height="234" className="h-9 w-auto" />
                     </Link>
                     <div className="flex items-center gap-1">
