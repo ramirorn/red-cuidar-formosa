@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react';
-import { useNavigate, useSearchParams } from 'react-router';
+import { useLocation, useNavigate, useSearchParams } from 'react-router';
 import { Camera, Flashlight, FlashlightOff, ImagePlus, LoaderCircle, X } from 'lucide-react';
 import { NOMBRES_CLASE } from '@/deteccion/clases';
 import { useDetector } from '@/deteccion/useDetector';
+import { useVolver } from '@/hooks/useVolver';
 import { comprimirImagen } from '@/lib/imagenes';
 import { cn } from '@/lib/utils';
 import type { Deteccion, TipoReporte } from '@/tipos';
@@ -35,6 +36,10 @@ const Recuadros = ({ detecciones, ancho, alto }: { detecciones: Deteccion[]; anc
 export default function Escaner() {
     const navegar = useNavigate();
     const [parametros] = useSearchParams();
+    const ubicacion = useLocation();
+    const cerrar = useVolver('/app');
+    // Si se abrió desde el reporte ("agregar otra foto"), al terminar se vuelve a él.
+    const desdeReporte = Boolean((ubicacion.state as { volverAlReporte?: boolean } | null)?.volverAlReporte);
     const borrador = useBorrador();
     const { estado: estadoDetector, detectar } = useDetector();
 
@@ -110,7 +115,8 @@ export default function Escaner() {
         setLinterna(!linterna);
     };
 
-    const terminar = useCallback(() => navegar('/app/reportar'), [navegar]);
+    // El escáner se reemplaza en el historial: "volver" desde el reporte no reabre un escáner vacío.
+    const terminar = useCallback(() => (desdeReporte ? navegar(-1) : navegar('/app/reportar', { replace: true })), [navegar, desdeReporte]);
 
     const capturar = async () => {
         const elemento = video.current;
@@ -165,7 +171,7 @@ export default function Escaner() {
                 )}
 
                 <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-3 p-4 pt-[max(1rem,env(safe-area-inset-top))]">
-                    <button type="button" onClick={() => navegar(-1)} aria-label="Cerrar el escáner" className="grid size-11 place-items-center rounded-full bg-black/55 backdrop-blur">
+                    <button type="button" onClick={cerrar} aria-label="Cerrar el escáner" className="grid size-11 place-items-center rounded-full bg-black/55 backdrop-blur">
                         <X aria-hidden />
                     </button>
 

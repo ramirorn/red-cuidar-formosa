@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react';
-import { Link } from 'react-router';
-import { ArrowLeft } from 'lucide-react';
+import { BotonVolver } from '@/componentes/ui/BotonVolver';
 import { Rotulo } from '@/componentes/ui/Tipografia';
 import { cn } from '@/lib/utils';
 
@@ -17,11 +16,8 @@ interface Propiedades {
 export const EncabezadoPagina = ({ rotulo, titulo, descripcion, acciones, volverA, className }: Propiedades) => (
     <header className={cn('flex flex-wrap items-end justify-between gap-4', className)}>
         <div className="min-w-0">
-            {volverA && (
-                <Link to={volverA} className="mb-3 inline-flex items-center gap-1.5 text-sm font-extrabold text-verde-700 hover:underline">
-                    <ArrowLeft className="size-4" aria-hidden />Volver
-                </Link>
-            )}
+            {/* Vuelve a la pantalla anterior (con sus filtros); si se entró por enlace, a "volverA". */}
+            {volverA && <BotonVolver respaldo={volverA} className="mb-2 -ml-1" />}
             {rotulo && <Rotulo className="mb-1.5">{rotulo}</Rotulo>}
             <h1 className="text-2xl leading-tight font-black tracking-tight sm:text-3xl">{titulo}</h1>
             {descripcion && <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-tinta-suave">{descripcion}</p>}

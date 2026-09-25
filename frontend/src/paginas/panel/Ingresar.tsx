@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Navigate, useLocation, useNavigate } from 'react-router';
-import { Eye, EyeOff, LoaderCircle, LockKeyhole, ShieldCheck } from 'lucide-react';
+import { Link, Navigate, useLocation, useNavigate } from 'react-router';
+import { ArrowLeft, Eye, EyeOff, LoaderCircle, LockKeyhole, ShieldCheck } from 'lucide-react';
 import { isAxiosError } from 'axios';
 import { useSesionPanel } from '@/autenticacion/SesionPanel';
 import { Campo, Entrada } from '@/componentes/panel/Campos';
@@ -105,6 +105,11 @@ export default function Ingresar() {
                         </Boton>
                     </form>
                     <p className="mt-8 text-center text-xs text-gris-texto">¿No tenés cuenta? Pedísela a la administración del sistema.</p>
+                    <p className="mt-3 text-center">
+                        <Link to="/" className="inline-flex items-center gap-1.5 text-sm font-extrabold text-verde-700 hover:underline">
+                            <ArrowLeft className="size-4" aria-hidden />Volver al sitio de Red-Cuidar
+                        </Link>
+                    </p>
                 </div>
             </main>
         </div>

@@ -3,13 +3,14 @@ import { Link, useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { ChevronRight, LoaderCircle, Plus, Route, Sparkles } from 'lucide-react';
 import { useUsuarioPanel } from '@/autenticacion/SesionPanel';
-import { Campo, Entrada, Filtro, Selector } from '@/componentes/panel/Campos';
+import { Campo, Filtro, Selector } from '@/componentes/panel/Campos';
 import { ChipRuta } from '@/componentes/panel/Chips';
 import { Dialogo } from '@/componentes/panel/Dialogo';
 import { EncabezadoPagina } from '@/componentes/panel/Encabezado';
 import { CargarMas, EsqueletoFilas, ErrorCarga, EstadoVacio } from '@/componentes/panel/Estados';
 import { BarraFiltros, SelectorLocalidad } from '@/componentes/panel/Filtros';
 import { Boton } from '@/componentes/ui/Boton';
+import { SelectorFecha } from '@/componentes/ui/SelectoresFecha';
 import { Tarjeta } from '@/componentes/ui/Tarjeta';
 import { useBrigadistas, useGenerarRuta, useLocalidadesPanel, useRutas } from '@/hooks/usePanel';
 import { errorAmigable } from '@/lib/errores';
@@ -59,7 +60,7 @@ const GenerarRuta = ({ alTerminar }: { alTerminar: (id: number) => void }) => {
                 <Sparkles className="mt-0.5 size-4 shrink-0" aria-hidden />
                 Toma primero las manzanas en rojo y después las amarillas más recientes, sin repetir las de otra ruta del mismo día, y las ordena para caminar lo menos posible.
             </p>
-            <Campo etiqueta="Fecha">{(props) => <Entrada {...props} type="date" value={fecha} min={hoyIso()} onChange={(evento) => setFecha(evento.target.value)} required />}</Campo>
+            <Campo etiqueta="Fecha">{(props) => <SelectorFecha {...props} valor={fecha} min={hoyIso()} alCambiar={setFecha} />}</Campo>
             {esProvincial && (
                 <Campo etiqueta="Localidad" ayuda="Las rutas se arman dentro de una localidad.">
                     {(props) => (
@@ -81,7 +82,7 @@ const GenerarRuta = ({ alTerminar }: { alTerminar: (id: number) => void }) => {
             <Campo etiqueta={`Cantidad máxima de paradas: ${maxParadas}`}>
                 {(props) => <input {...props} type="range" min={5} max={60} step={1} value={maxParadas} onChange={(evento) => setMaxParadas(Number(evento.target.value))} className="w-full accent-verde-600" />}
             </Campo>
-            <Boton type="submit" anchoCompleto disabled={generar.isPending || (esProvincial && !localidadId)}
+            <Boton type="submit" anchoCompleto disabled={generar.isPending || !fecha || (esProvincial && !localidadId)}
                 icono={generar.isPending ? <LoaderCircle className="size-5 animate-spin" aria-hidden /> : <Route className="size-5" aria-hidden />}>
                 {generar.isPending ? 'Generando…' : 'Generar ruta'}
             </Boton>
@@ -111,7 +112,7 @@ export default function Rutas() {
             />
 
             <BarraFiltros>
-                <Filtro etiqueta="Fecha">{(id) => <Entrada id={id} type="date" value={fecha} onChange={(evento) => setFecha(evento.target.value)} />}</Filtro>
+                <Filtro etiqueta="Fecha" className="min-w-52">{(id) => <SelectorFecha id={id} valor={fecha} alCambiar={setFecha} opcional textoVacio="Todas las fechas" />}</Filtro>
                 <Filtro etiqueta="Estado">
                     {(id) => (
                         <Selector id={id} value={estado ?? ''} onChange={(evento) => setEstado((evento.target.value || undefined) as EstadoRuta | undefined)}>
@@ -121,7 +122,6 @@ export default function Rutas() {
                     )}
                 </Filtro>
                 <SelectorLocalidad valor={localidadId} alCambiar={setLocalidadId} />
-                {fecha && <Boton variante="fantasma" tamano="chico" onClick={() => setFecha('')}>Todas las fechas</Boton>}
             </BarraFiltros>
 
             {error && <ErrorCarga error={error} alReintentar={() => void refetch()} />}

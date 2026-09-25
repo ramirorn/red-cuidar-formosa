@@ -1,6 +1,6 @@
 import { lazy } from 'react';
 import { Navigate } from 'react-router';
-import { MENU } from './DisposicionPanel';
+import { MENU } from '@/componentes/panel/menu';
 import { SinAcceso } from '@/autenticacion/Proteccion';
 import { useSesionPanel } from '@/autenticacion/SesionPanel';
 

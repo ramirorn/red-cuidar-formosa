@@ -127,7 +127,7 @@ export default function Reportar() {
                 <div className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-2">
                     {borrador.fotos.map((foto) => <FotoConRecuadros key={foto.id} foto={foto} alQuitar={() => borrador.quitarFoto(foto.id)} />)}
                     {borrador.fotos.length < MAXIMO_FOTOS && (
-                        <BotonEnlace to="/app/escanear" variante="contorno" className="h-auto w-32 shrink-0 flex-col rounded-2xl border-dashed py-6" icono={<Plus aria-hidden />}>
+                        <BotonEnlace to="/app/escanear" state={{ volverAlReporte: true }} variante="contorno" className="h-auto w-32 shrink-0 flex-col rounded-2xl border-dashed py-6" icono={<Plus aria-hidden />}>
                             Agregar foto
                         </BotonEnlace>
                     )}

@@ -1,8 +1,9 @@
 import { useEffect } from 'react';
-import { Link, NavLink, Outlet } from 'react-router';
-import { CloudUpload, House, ListChecks, Map, MessageCircleHeart, Wifi, WifiOff } from 'lucide-react';
+import { Link, NavLink, Outlet, useMatches, useNavigate } from 'react-router';
+import { ArrowLeft, CloudUpload, House, ListChecks, Map, MessageCircleHeart, Wifi, WifiOff } from 'lucide-react';
 import { useColaReportes } from '@/hooks/useColaReportes';
 import { useEnLinea } from '@/hooks/useEnLinea';
+import { useVolver } from '@/hooks/useVolver';
 import { cn } from '@/lib/utils';
 
 const NAVEGACION = [
@@ -42,14 +43,41 @@ const IndicadorConexion = () => {
 };
 
 // Estructura de la PWA: barra superior compacta y navegación inferior al alcance del pulgar.
+export interface DatosSubpantalla {
+    titulo: string;
+    volverA: string;
+    directo?: boolean;
+}
+
+// Botón de la barra superior: vuelve a la pantalla anterior o, si se entró directo, al respaldo.
+const BotonAtras = ({ respaldo, directo }: { respaldo: string; directo: boolean }) => {
+    const volver = useVolver(respaldo);
+    const navegar = useNavigate();
+    return (
+        <button type="button" onClick={() => (directo ? navegar(respaldo) : volver())} aria-label="Volver"
+            className="-ml-2 grid size-11 shrink-0 place-items-center rounded-full hover:bg-gris-superficie active:bg-bruma">
+            <ArrowLeft className="size-6" aria-hidden />
+        </button>
+    );
+};
+
 export default function DisposicionVecino() {
+    // Las pantallas que no están en la barra inferior declaran título y destino de "volver" en el router.
+    const subpantalla = useMatches().map((coincidencia) => coincidencia.handle as DatosSubpantalla | undefined).findLast(Boolean);
     return (
         <div className="flex min-h-dvh flex-col bg-crema">
                 <header className="sticky top-0 z-30 border-b border-gris-borde/70 bg-white/95 pt-[env(safe-area-inset-top)] backdrop-blur">
                     <div className="mx-auto flex h-14 max-w-2xl items-center justify-between px-4">
-                        <Link to="/app" aria-label="Red-Cuidar Formosa, inicio">
-                            <img src="/marca/logo-horizontal.webp" alt="Red-Cuidar Formosa" width="529" height="234" className="h-10 w-auto" />
-                        </Link>
+                        {subpantalla ? (
+                            <div className="flex min-w-0 items-center gap-1">
+                                <BotonAtras respaldo={subpantalla.volverA} directo={subpantalla.directo ?? false} />
+                                <p className="truncate text-lg font-black">{subpantalla.titulo}</p>
+                            </div>
+                        ) : (
+                            <Link to="/app" aria-label="Red-Cuidar Formosa, inicio">
+                                <img src="/marca/logo-horizontal.webp" alt="Red-Cuidar Formosa" width="529" height="234" className="h-10 w-auto" />
+                            </Link>
+                        )}
                         <IndicadorConexion />
                     </div>
                 </header>

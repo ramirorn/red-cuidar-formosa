@@ -1,11 +1,13 @@
-import { useForm, useWatch } from 'react-hook-form';
+import { Controller, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
 import { Bug, ClipboardCheck, LoaderCircle, SprayCan, Trash2 } from 'lucide-react';
 import { Boton } from '@/componentes/ui/Boton';
+import { SelectorFechaHora } from '@/componentes/ui/SelectoresFecha';
 import { useRegistrarIntervencion } from '@/hooks/usePanel';
 import { errorAmigable } from '@/lib/errores';
+import { ahoraLocal } from '@/lib/fechas';
 import { TIPOS_INTERVENCION, UNIDADES } from '@/lib/etiquetasPanel';
 import { cn } from '@/lib/utils';
 import type { TipoIntervencion, UnidadProducto } from '@/tipos/panel';
@@ -27,13 +29,6 @@ const DESCRIPCIONES: Record<TipoIntervencion, string> = {
 
 const TIPOS = Object.keys(TIPOS_INTERVENCION) as TipoIntervencion[];
 const UNIDADES_LISTA = Object.keys(UNIDADES) as UnidadProducto[];
-
-// Fecha local para <input type="datetime-local"> (sin segundos ni zona).
-const ahoraLocal = () => {
-    const fecha = new Date();
-    fecha.setMinutes(fecha.getMinutes() - fecha.getTimezoneOffset());
-    return fecha.toISOString().slice(0, 16);
-};
 
 const esquema = z.object({
     tipo: z.enum(TIPOS as [TipoIntervencion, ...TipoIntervencion[]], { error: 'Elegí qué se hizo' }),
@@ -136,7 +131,11 @@ export const FormularioIntervencion = ({ manzana, reporteId, paradaRutaId, ubica
             )}
 
             <Campo etiqueta="Fecha y hora" error={errors.realizadaEn?.message}>
-                {(props) => <Entrada {...props} {...register('realizadaEn')} type="datetime-local" max={ahoraLocal()} />}
+                {(props) => (
+                    <Controller control={control} name="realizadaEn" render={({ field }) => (
+                        <SelectorFechaHora {...props} valor={field.value} alCambiar={field.onChange} max={ahoraLocal()} />
+                    )} />
+                )}
             </Campo>
             <Campo etiqueta="Observaciones (opcional)" error={errors.observaciones?.message}>
                 {(props) => <AreaTexto {...props} {...register('observaciones')} maxLength={500} placeholder="Lo que conviene que sepa el equipo" />}
