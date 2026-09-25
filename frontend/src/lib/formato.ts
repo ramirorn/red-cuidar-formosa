@@ -12,3 +12,14 @@ export const hace = (fecha: string | Date) => {
     }
     return 'recién';
 };
+
+// Fechas "solo día" del backend (2026-09-24T00:00:00.000Z): se muestran en UTC para no correrse un día.
+const formatoDiaCalendario = new Intl.DateTimeFormat('es-AR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
+export const formatearDia = (fecha: string) => formatoDiaCalendario.format(new Date(fecha));
+
+// Hoy en la zona del dispositivo, como AAAA-MM-DD (para <input type="date"> y filtros por fecha).
+export const hoyIso = () => {
+    const ahora = new Date();
+    ahora.setMinutes(ahora.getMinutes() - ahora.getTimezoneOffset());
+    return ahora.toISOString().slice(0, 10);
+};

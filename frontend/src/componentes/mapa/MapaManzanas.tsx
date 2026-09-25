@@ -1,5 +1,5 @@
 import 'leaflet/dist/leaflet.css';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, type ReactNode } from 'react';
 import { CircleMarker, GeoJSON, MapContainer, TileLayer, useMap, useMapEvents } from 'react-leaflet';
 import type { LatLngBoundsExpression, PathOptions } from 'leaflet';
 import type { Recuadro } from '@/api/vecino.api';
@@ -46,6 +46,13 @@ const Recentrar = ({ centro, zoom }: { centro: [number, number]; zoom: number })
     return null;
 };
 
+// Lleva el mapa a un punto cuando cambia el enfoque pedido (por ejemplo, al elegir una manzana de una lista).
+const Enfocar = ({ enfoque }: { enfoque: { centro: [number, number]; zoom: number } }) => {
+    const mapa = useMap();
+    useEffect(() => { mapa.flyTo(enfoque.centro, enfoque.zoom, { duration: 0.6 }); }, [mapa, enfoque]);
+    return null;
+};
+
 interface Propiedades {
     centro: [number, number];
     zoom?: number;
@@ -57,9 +64,13 @@ interface Propiedades {
     alElegir?: (manzana: FeatureManzana) => void;
     className?: string;
     limites?: LatLngBoundsExpression;
+    enfoque?: { centro: [number, number]; zoom: number } | null;
+    children?: ReactNode;
+    // Dibuja en canvas: mucho más liviano cuando hay miles de puntos (mapa de riesgo provincial).
+    enLienzo?: boolean;
 }
 
-export const MapaManzanas = ({ centro, zoom = 17, manzanas, seleccionadaId, ubicacion, interactivo = true, alMover, alElegir, className }: Propiedades) => {
+export const MapaManzanas = ({ centro, zoom = 17, manzanas, seleccionadaId, ubicacion, interactivo = true, alMover, alElegir, className, enfoque, children, enLienzo = false }: Propiedades) => {
     // GeoJSON de react-leaflet no se re-renderiza al cambiar datos: la clave fuerza el reemplazo.
     const clave = useMemo(() => manzanas.map((manzana) => `${manzana.id}:${manzana.properties.estado}`).join('|') + `#${seleccionadaId ?? ''}`, [manzanas, seleccionadaId]);
 
@@ -74,6 +85,7 @@ export const MapaManzanas = ({ centro, zoom = 17, manzanas, seleccionadaId, ubic
             doubleClickZoom={interactivo}
             touchZoom={interactivo}
             attributionControl
+            preferCanvas={enLienzo}
         >
             <TileLayer
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
@@ -92,6 +104,8 @@ export const MapaManzanas = ({ centro, zoom = 17, manzanas, seleccionadaId, ubic
                     if (alElegir) capa.on('click', () => alElegir(manzana));
                 }}
             />
+            {enfoque && <Enfocar enfoque={enfoque} />}
+            {children}
             {ubicacion && <CircleMarker center={ubicacion} radius={9} pathOptions={{ color: '#fff', weight: 3, fillColor: '#2563eb', fillOpacity: 1 }} />}
         </MapContainer>
     );

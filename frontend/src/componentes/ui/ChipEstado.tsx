@@ -40,7 +40,7 @@ export const ChipEstado = ({ estado, tamano = 'medio', className }: { estado: Es
     return (
         <span
             className={cn(
-                'inline-flex items-center gap-1.5 rounded-full font-extrabold ring-1 ring-inset',
+                'inline-flex shrink-0 items-center gap-1.5 rounded-full font-extrabold whitespace-nowrap ring-1 ring-inset',
                 tamano === 'chico' && 'px-2.5 py-1 text-xs',
                 tamano === 'medio' && 'px-3 py-1.5 text-sm',
                 tamano === 'grande' && 'px-4 py-2 text-base',
