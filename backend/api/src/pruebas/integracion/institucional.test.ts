@@ -173,6 +173,19 @@ describe('autenticación con la base real', () => {
         expect(await prisma.auditoriaAcceso.count({ where: { accion: 'ACTUALIZAR_USUARIO' } })).toBe(1);
     });
 
+    it('los intentos fallidos bloquean esa cuenta, pero no a otras cuentas desde la misma IP', async () => {
+        const atacada = await crearUsuario('EPIDEMIOLOGO');
+        const colega = await crearUsuario('EPIDEMIOLOGO');
+
+        const intentos = [];
+        for (let i = 0; i < 11; i++) intentos.push((await iniciarSesion(atacada.email, 'ClaveIncorrecta99')).status);
+
+        expect(intentos.slice(0, 10).every((estado) => estado === 401)).toBe(true);
+        expect(intentos[10]).toBe(429);
+        expect((await iniciarSesion(atacada.email, atacada.password)).status).toBe(429);
+        expect((await iniciarSesion(colega.email, colega.password)).status).toBe(200);
+    });
+
     it('un email inexistente y una contraseña incorrecta responden igual', async () => {
         const administrador = await crearUsuario('ADMINISTRADOR');
 

@@ -21,8 +21,9 @@ info:
     **Paginación:** los listados usan cursor opaco (`cursor`) y `limite` (1 a 200, por defecto 50).
     Para pedir la página siguiente se envía `pagination.siguienteCursor`.
 
-    **Límites de tasa:** 300 peticiones por minuto e IP en general; 20 sesiones por hora e IP;
-    30 reportes cada 15 minutos por sesión; 10 intentos de login cada 15 minutos por IP.
+    **Límites de tasa:** 300 peticiones por minuto e IP en general; 60 sesiones por hora e IP;
+    30 reportes y 20 mensajes de chat (cada 15 y 5 minutos) por sesión; login: 10 intentos cada 15 minutos
+    por cuenta y 100 por IP; refresco: 20 cada 15 minutos por token.
     Al superarlos se responde 429 con las cabeceras `RateLimit` y `RateLimit-Policy`.
 servers:
   - url: http://localhost:3000/api
