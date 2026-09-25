@@ -3,6 +3,8 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
     test: {
         include: ['src/**/*.test.ts'],
+        // Las pruebas de integración necesitan PostgreSQL: se corren con npm run test:integracion.
+        exclude: ['src/pruebas/integracion/**', 'node_modules/**'],
         env: {
             NODE_ENV: 'test',
             DATABASE_URL: 'postgresql://prueba:prueba@localhost:5432/prueba',

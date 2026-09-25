@@ -15,3 +15,6 @@ npm-debug.log*
 # Configuraciones locales del editor y sistema operativo
 .vscode/
 .DS_Store
+
+# Volcados de Redis de desarrollo local
+dump.rdb

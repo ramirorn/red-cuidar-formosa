@@ -34,9 +34,15 @@ docker compose exec api npm run semilla   # localidades, primer administrador y 
 Pruebas:
 
 ```bash
-cd api && npm test                                  # Vitest + Supertest
+cd api && npm test                                  # Vitest + Supertest (unitarias, sin base)
+cd api && npm run test:integracion                  # contra PostgreSQL + PostGIS reales
 cd motor-predictivo && pip install -r requirements-dev.txt && pytest pruebas
 ```
+
+Las pruebas de integración usan una base exclusiva cuyo nombre debe contener `pruebas` (por defecto
+`red_cuidar_pruebas`; se cambia con `DATABASE_URL_PRUEBAS`), porque la vacían en cada archivo. Cubren PostGIS,
+concurrencia (reintentos y validaciones simultáneas), alcance territorial, rotación de tokens, exportación por
+lotes y cantidad de consultas SQL (detección de N+1).
 
 ## Convenciones de código
 

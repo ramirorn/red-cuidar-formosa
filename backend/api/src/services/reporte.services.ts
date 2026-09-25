@@ -102,7 +102,7 @@ export const crearReporteService = async (sesionId: string, datos: DatosReporte,
     }
     const imagenReutilizada = await prisma.evidencia.findFirst({ where: { sha256: { in: hashes } }, select: { id: true } });
     if (imagenReutilizada) {
-        throw new ErrorHttp(409, 'Una de las imágenes ya fue enviada en otro reporte');
+        return resolverConflictoDeImagen(sesionId, datos.idCliente);
     }
 
     const rutas: string[] = [];
@@ -208,10 +208,18 @@ export const crearReporteService = async (sesionId: string, datos: DatosReporte,
     } catch (error) {
         await eliminarImagenesService(rutas);
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-            throw new ErrorHttp(409, 'Una de las imágenes ya fue enviada en otro reporte');
+            return resolverConflictoDeImagen(sesionId, datos.idCliente);
         }
         throw error;
     }
+};
+
+// Una foto repetida puede venir de otro reporte (se rechaza) o de un reintento simultáneo del
+// mismo reporte que se guardó un instante antes (se responde como reintento exitoso).
+const resolverConflictoDeImagen = async (sesionId: string, idCliente: string) => {
+    const mismoReporte = await buscarPorIdCliente(sesionId, idCliente);
+    if (mismoReporte) return { reporte: mismoReporte, creado: false };
+    throw new ErrorHttp(409, 'Una de las imágenes ya fue enviada en otro reporte');
 };
 
 // Permite a la PWA conciliar su cola local con lo que el servidor ya recibió.

@@ -8,6 +8,7 @@
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/app.js",
     "test": "vitest run",
+    "test:integracion": "vitest run --config vitest.integracion.config.ts",
     "typecheck": "tsc --noEmit",
     "semilla": "tsx prisma/semilla.ts",
     "importar-manzanas": "tsx prisma/importarManzanas.ts",
