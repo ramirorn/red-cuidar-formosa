@@ -38,6 +38,9 @@ docker compose exec api npm run semilla   # localidades, primer administrador y 
   (llena el mapa, la Copa y las métricas). Se puede repetir: borra la simulación anterior y no toca datos reales.
   Opciones: `--localidad "Clorinda"`, `--semilla 7`, `--pendientes 0`, `--borrar` (solo borra la simulación).
   Correrlo después de `importar-osm`, que reemplaza las manzanas.
+- **Premio de prueba (para probar el canje):** `docker compose exec api npm run premio-de-prueba`. Toma un reporte
+  de una zona del podio del último mes cerrado y da un código `RC-XXXX-XXXX` para canjear en Panel → Canje de premios.
+  Necesita datos simulados. Cada vez que se corre da un código nuevo.
 - Flujos de n8n: `docker compose exec n8n sh /orquestador/importar.sh && docker compose restart n8n`
   (ver `orquestador/README.md`).
 - Web Push: generar las claves con `cd api && npm run generar-vapid` y cargarlas en `.env`.

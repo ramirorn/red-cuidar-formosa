@@ -31,6 +31,24 @@ describe('rutas de brigada', () => {
             .toEqual(['ROJO', 'ROJO', 'ROJO']);
     });
 
+    it('sin punto de partida arranca en el foco (donde se juntan las rojas), no en el reporte más nuevo', async () => {
+        // Una roja aislada a ~1 km, con el reporte más reciente de todas.
+        await prisma.$executeRaw`
+            INSERT INTO "manzana" ("localidadId", "codigo", "geom", "centroide", "estado", "ultimoReporteEn", "updatedAt")
+            VALUES (${territorio.localidades.capital}, 'aislada',
+                ST_MakeEnvelope(-58.1701, -26.1899, -58.1693, -26.1891, 4326), ST_SetSRID(ST_MakePoint(-58.1697, -26.1895), 4326),
+                'ROJO', now(), now())`;
+        const coordinador = await crearUsuario('COORDINADOR_BRIGADA', territorio.localidades.capital);
+
+        const respuesta = await generar(coordinador.token, 4);
+
+        const codigos = respuesta.body.data.paradas.map((parada: { manzana: { codigo: string } }) => parada.manzana.codigo);
+        expect(codigos).toHaveLength(4);
+        expect(codigos[0]).toMatch(/^capital-0/);
+        // La aislada queda para el final: se llega después de recorrer el foco.
+        expect(codigos.at(-1)).toBe('aislada');
+    });
+
     it('dos coordinadores que generan a la vez no se asignan las mismas manzanas', async () => {
         const primero = await crearUsuario('COORDINADOR_BRIGADA', territorio.localidades.capital);
         const segundo = await crearUsuario('COORDINADOR_BRIGADA', territorio.localidades.capital);

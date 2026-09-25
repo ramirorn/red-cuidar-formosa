@@ -35,9 +35,31 @@ const validarBrigadista = async (brigadistaId: number, localidadId: number): Pro
     }
 };
 
+// Radio para medir qué tan "rodeada de rojo" está una manzana.
+export const RADIO_FOCO_M = 300;
+
+// Sin punto de partida, la ruta arranca en el foco: la manzana roja de la ruta con más manzanas rojas
+// alrededor (en empate, la de reporte más reciente). Sin rojas, arranca en la primera candidata.
+const focoDeContagio = async (tx: Prisma.TransactionClient, localidadId: number, candidatas: ManzanaCandidata[]): Promise<Coordenada | undefined> => {
+    const rojas = candidatas.filter((manzana) => manzana.estado === 'ROJO').map((manzana) => manzana.id);
+    if (rojas.length === 0) return undefined;
+    const [foco] = await tx.$queryRaw<{ id: number }[]>`
+        SELECT m."id"
+        FROM "manzana" m
+        CROSS JOIN LATERAL (
+            SELECT count(*) AS vecinas FROM "manzana" o
+            WHERE o."localidadId" = ${localidadId} AND o."estado" = 'ROJO' AND o."id" <> m."id"
+              AND ST_DWithin(o."centroide"::geography, m."centroide"::geography, ${RADIO_FOCO_M})
+        ) v
+        WHERE m."id" = ANY(${rojas}::int[])
+        ORDER BY v.vecinas DESC, m."ultimoReporteEn" DESC NULLS LAST, m."id"
+        LIMIT 1`;
+    return candidatas.find((manzana) => manzana.id === foco?.id);
+};
+
 // Arma la ruta del día con las manzanas en ROJO primero y luego las AMARILLAS más recientes,
 // excluyendo las que ya están en otra ruta activa de la misma fecha, y ordena las paradas
-// por vecino más cercano desde el punto de partida.
+// por vecino más cercano desde el punto de partida (o, si no se indica, desde el foco de contagio).
 export const generarRutaService = async (usuario: UsuarioAutenticado, datos: DatosNuevaRuta) => {
     const localidadId = alcanceLocalidad(usuario, datos.localidadId);
     if (localidadId === null) throw new ErrorHttp(422, 'Debe indicar la localidad de la ruta');
@@ -72,7 +94,8 @@ export const generarRutaService = async (usuario: UsuarioAutenticado, datos: Dat
             throw new ErrorHttp(422, 'No hay manzanas en rojo o amarillo pendientes de visita para esa fecha');
         }
 
-        const { orden, distanciaTotalM: distancia } = ordenarPorVecinoMasCercano(candidatas, datos.inicio);
+        const inicio = datos.inicio ?? await focoDeContagio(tx, localidadId, candidatas);
+        const { orden, distanciaTotalM: distancia } = ordenarPorVecinoMasCercano(candidatas, inicio);
 
         const nueva = await tx.rutaBrigada.create({
             data: {

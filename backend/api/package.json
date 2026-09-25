@@ -17,6 +17,7 @@
     "importar-zonas": "tsx prisma/importarZonas.ts",
     "importar-osm": "tsx prisma/importarOsm.ts",
     "simular-datos": "tsx prisma/simularDatos.ts",
+    "premio-de-prueba": "tsx prisma/premioDePrueba.ts",
     "generar-vapid": "web-push generate-vapid-keys"
   },
   "keywords": [],

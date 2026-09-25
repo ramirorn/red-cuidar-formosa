@@ -863,7 +863,7 @@ paths:
       summary: Genera la ruta del día para una brigada
       description: |
         Permiso `rutas:gestionar`. Toma primero las manzanas en ROJO y luego las AMARILLAS más recientes,
-        sin repetir las que ya están en otra ruta activa de la misma fecha, y las ordena por vecino más cercano.
+        sin repetir las que ya están en otra ruta activa de la misma fecha, y las ordena por vecino más cercano desde `inicio` o, si no se indica, desde el foco (la manzana roja con más rojas a menos de 300 m).
         Los roles provinciales deben indicar `localidadId`.
       tags: [Rutas]
       security:
