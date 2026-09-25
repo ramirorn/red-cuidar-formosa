@@ -20,6 +20,7 @@ const MapaBarrio = lazy(() => import('@/paginas/vecino/MapaBarrio'));
 const Chat = lazy(() => import('@/paginas/vecino/Chat'));
 const Alertas = lazy(() => import('@/paginas/vecino/Alertas'));
 const Consejos = lazy(() => import('@/paginas/vecino/Consejos'));
+const Copa = lazy(() => import('@/paginas/vecino/Copa'));
 
 const RaizPanel = lazy(() => import('@/paginas/panel/RaizPanel'));
 const Ingresar = lazy(() => import('@/paginas/panel/Ingresar'));
@@ -34,6 +35,8 @@ const Intervenciones = lazy(() => import('@/paginas/panel/Intervenciones'));
 const Exportaciones = lazy(() => import('@/paginas/panel/Exportaciones'));
 const Usuarios = lazy(() => import('@/paginas/panel/Usuarios'));
 const Auditoria = lazy(() => import('@/paginas/panel/Auditoria'));
+const CopaPanel = lazy(() => import('@/paginas/panel/CopaPanel'));
+const Canjes = lazy(() => import('@/paginas/panel/Canjes'));
 const Campo = lazy(() => import('@/paginas/panel/campo/Campo'));
 const CampoRuta = lazy(() => import('@/paginas/panel/campo/CampoRuta'));
 
@@ -60,6 +63,7 @@ export const router = createBrowserRouter([
                     { path: 'chat', element: conCarga(<Chat />) },
                     { path: 'alertas', element: conCarga(<Alertas />), handle: { titulo: 'Alertas', volverA: '/app' } },
                     { path: 'consejos', element: conCarga(<Consejos />), handle: { titulo: 'Consejos', volverA: '/app' } },
+                    { path: 'copa', element: conCarga(<Copa />), handle: { titulo: 'Copa Red-Cuidar', volverA: '/app' } },
                 ],
             },
         ],
@@ -85,6 +89,8 @@ export const router = createBrowserRouter([
                     { path: 'intervenciones', element: conCarga(<RequierePermiso permiso="intervenciones:leer"><Intervenciones /></RequierePermiso>) },
                     { path: 'exportaciones', element: conCarga(<RequierePermiso permiso="exportaciones:descargar"><Exportaciones /></RequierePermiso>) },
                     { path: 'usuarios', element: conCarga(<RequierePermiso permiso="usuarios:gestionar"><Usuarios /></RequierePermiso>) },
+                    { path: 'copa', element: conCarga(<RequierePermiso permiso="metricas:leer"><CopaPanel /></RequierePermiso>) },
+                    { path: 'canjes', element: conCarga(<RequierePermiso permiso="premios:canjear"><Canjes /></RequierePermiso>) },
                     { path: 'auditoria', element: conCarga(<RequierePermiso permiso="auditoria:leer"><Auditoria /></RequierePermiso>) },
                     { path: '*', element: conCarga(<NoEncontrada />) },
                 ],

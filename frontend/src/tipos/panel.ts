@@ -1,5 +1,5 @@
 // Tipos de la API Core del Dashboard Institucional (backend/api/openapi.yaml).
-import type { CajaDelimitadora, ClaseObjeto, EstadoManzana, EstadoReporte, TipoReporte } from './index';
+import type { CajaDelimitadora, ClaseObjeto, EdicionCopa, EstadoManzana, EstadoReporte, PuntosCopa, TipoReporte, ZonaCopa } from './index';
 
 export type Rol = 'ADMINISTRADOR' | 'EPIDEMIOLOGO' | 'COORDINADOR_BRIGADA' | 'BRIGADISTA' | 'AUDITOR';
 export type TipoIntervencion = 'APLICACION_BTI' | 'FUMIGACION' | 'DESCACHARRADO' | 'INSPECCION';
@@ -19,7 +19,8 @@ export type Permiso =
     | 'rutas:gestionar'
     | 'rutas:ejecutar'
     | 'usuarios:gestionar'
-    | 'auditoria:leer';
+    | 'auditoria:leer'
+    | 'premios:canjear';
 
 export interface UsuarioActual {
     id: number;
@@ -237,4 +238,24 @@ export interface RegistroAuditoria {
 export interface RangoFechas {
     desde?: string;
     hasta?: string;
+}
+
+export interface ZonaCopaPanel extends ZonaCopa {
+    premiada: boolean;
+    premios: { emitidos: number; canjeados: number };
+}
+
+export interface RankingCopa {
+    edicion: EdicionCopa;
+    localidadId: number;
+    zonas: ZonaCopaPanel[];
+    puntos: PuntosCopa;
+}
+
+export interface CanjeRealizado {
+    codigo: string;
+    edicion: string;
+    zona: { nombre: string; barrio: string };
+    localidad: string;
+    canjeadoEn: string;
 }

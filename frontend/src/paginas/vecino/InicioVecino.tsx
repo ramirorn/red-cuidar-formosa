@@ -12,6 +12,7 @@ import {
     MessageCircleHeart,
     ScanSearch,
     Sparkles,
+    Trophy,
     UserRoundX,
     WifiOff,
 } from 'lucide-react';
@@ -205,6 +206,15 @@ export default function InicioVecino() {
             <BotonEnlace to="/app/limpieza" variante="contorno" anchoCompleto icono={<Sparkles className="size-4" aria-hidden />}>
                 Ya limpié: sacar foto de cómo quedó
             </BotonEnlace>
+
+            <Link to="/app/copa" className="flex items-center gap-4 rounded-tarjeta border-2 border-verde-600 bg-gradient-to-r from-verde-50 to-white p-4 shadow-suave transition hover:-translate-y-0.5">
+                <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-verde-600 text-white"><Trophy className="size-6" aria-hidden /></span>
+                <span className="flex-1">
+                    <span className="block font-black">Copa Red-Cuidar</span>
+                    <span className="block text-sm text-tinta-suave">¿Cómo va tu barrio este mes? Habrá premios para el podio.</span>
+                </span>
+                <ChevronRight className="size-5 text-verde-700" aria-hidden />
+            </Link>
 
             <nav aria-label="Accesos rápidos" className="grid grid-cols-2 gap-3">
                 {ACCESOS.map(({ a, texto, Icono, clases }) => (

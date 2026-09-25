@@ -1,5 +1,5 @@
 import { clientePublico, clienteVecino, datosDe } from './cliente';
-import type { ColeccionManzanas, Localidad, ReporteResumen, RespuestaChat } from '@/tipos';
+import type { ColeccionManzanas, Localidad, PodioCopa, PremioCopa, ReporteResumen, RespuestaChat, SituacionZona } from '@/tipos';
 
 export interface Recuadro {
     longitudMinima: number;
@@ -26,6 +26,14 @@ export const vecinoApi = {
     // Estado de los reportes propios, por los idCliente que guarda el celular (el servidor no sabe cuáles son).
     consultarPropios: async (idsCliente: string[]) =>
         datosDe<ReporteResumen[]>(await clienteVecino.post('/reportes/consulta', { idsCliente })),
+
+    // Copa Red-Cuidar: el podio y la situación de una zona son públicos; el premio exige sesión.
+    copaPodio: async (localidadId: number, mes?: string) =>
+        datosDe<PodioCopa>(await clientePublico.get('/copa', { params: { localidadId, ...(mes ? { mes } : {}) } })),
+    copaZona: async (zonaId: number, mes?: string) =>
+        datosDe<SituacionZona>(await clientePublico.get(`/copa/zonas/${zonaId}`, { params: mes ? { mes } : {} })),
+    pedirPremio: async (mes: string, idsCliente: string[]) =>
+        datosDe<PremioCopa | null>(await clienteVecino.post('/copa/premio', { mes, idsCliente })),
 
     enviarMensaje: async (mensaje: string, historial: MensajeHistorialApi[]) =>
         datosDe<RespuestaChat>(await clienteVecino.post('/chat/mensajes', { mensaje, historial }, { timeout: 100_000 })),

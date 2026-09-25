@@ -6,7 +6,7 @@ import type { EstadoRuta, Rol, TipoIntervencion, UnidadProducto } from '@/tipos/
 export const ROLES: Record<Rol, { etiqueta: string; descripcion: string }> = {
     ADMINISTRADOR: { etiqueta: 'Administración', descripcion: 'Toda la provincia. Gestiona usuarios y ve la auditoría. No ve fotos ni valida.' },
     EPIDEMIOLOGO: { etiqueta: 'Epidemiología', descripcion: 'Toda la provincia. La única que ve las fotos y valida reportes.' },
-    COORDINADOR_BRIGADA: { etiqueta: 'Coordinación de brigada', descripcion: 'Su localidad. Arma rutas, registra intervenciones y exporta.' },
+    COORDINADOR_BRIGADA: { etiqueta: 'Coordinación de brigada', descripcion: 'Su localidad. Arma rutas, registra intervenciones, exporta y entrega premios.' },
     BRIGADISTA: { etiqueta: 'Brigadista', descripcion: 'Su localidad. Recorre las rutas asignadas y registra intervenciones.' },
     AUDITOR: { etiqueta: 'Auditoría', descripcion: 'Toda la provincia, solo lectura. Ve la auditoría de accesos.' },
 };
@@ -65,6 +65,7 @@ export const ACCIONES_AUDITORIA: Record<string, string> = {
     EXPORTAR_CSV: 'Exportó un CSV',
     CREAR_USUARIO: 'Creó un usuario',
     ACTUALIZAR_USUARIO: 'Modificó un usuario',
+    CANJEAR_PREMIO: 'Entregó un premio de la Copa',
 };
 
 export const nombreCompleto = (persona: { nombre: string; apellido: string } | null | undefined) =>

@@ -23,3 +23,18 @@ export const hoyIso = () => {
     ahora.setMinutes(ahora.getMinutes() - ahora.getTimezoneOffset());
     return ahora.toISOString().slice(0, 10);
 };
+
+// Mes "AAAA-MM" en hora de Argentina (UTC-3, sin horario de verano), como lo cuenta la Copa.
+export const mesArgentino = (momento = new Date()) => new Date(momento.getTime() - 3 * 3_600_000).toISOString().slice(0, 7);
+
+export const mesAnterior = (mes: string) => {
+    const [anio, numero] = mes.split('-').map(Number) as [number, number];
+    const fecha = new Date(Date.UTC(anio, numero - 2, 1));
+    return fecha.toISOString().slice(0, 7);
+};
+
+const nombresMes = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+export const nombreDeMes = (mes: string) => {
+    const [anio, numero] = mes.split('-').map(Number) as [number, number];
+    return `${nombresMes[numero - 1]} ${anio}`;
+};

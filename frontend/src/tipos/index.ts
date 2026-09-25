@@ -57,7 +57,7 @@ export interface FeatureManzana {
     type: 'Feature';
     id: number;
     geometry: { type: 'Polygon'; coordinates: number[][][] };
-    properties: { codigo: string; estado: EstadoManzana; localidadId: number };
+    properties: { codigo: string; estado: EstadoManzana; localidadId: number; zonaId?: number | null };
 }
 
 export interface ColeccionManzanas {
@@ -69,4 +69,61 @@ export interface RespuestaChat {
     respuesta: string;
     nivelTriaje: NivelTriaje | null;
     firma: string;
+}
+
+// ---------------------------------------------------------------------------
+// Copa Red-Cuidar
+// ---------------------------------------------------------------------------
+
+export type EstadoEdicion = 'en-curso' | 'provisoria' | 'definitiva';
+
+export interface EdicionCopa {
+    mes: string;
+    nombre: string;
+    estado: EstadoEdicion;
+    cierraEn: string;
+    definitivaDesde: string;
+    premiosVencen: string;
+}
+
+export interface ZonaCopa {
+    id: number;
+    nombre: string;
+    barrio: string;
+    posicion: number;
+    manzanas: number;
+    limpiezas: number;
+    criaderos: number;
+    semanasVerdes: number;
+    puntos: number;
+    puntosPorManzana: number;
+}
+
+export interface PuntosCopa {
+    LIMPIEZA: number;
+    SEMANA_VERDE: number;
+    CRIADERO: number;
+}
+
+export interface PodioCopa {
+    edicion: EdicionCopa;
+    podio: ZonaCopa[];
+    totalZonas: number;
+    puntos: PuntosCopa;
+}
+
+export interface SituacionZona {
+    edicion: EdicionCopa;
+    zona: ZonaCopa & { enPodio: boolean };
+    totalZonas: number;
+    faltanPuntosPorManzana: number;
+    faltanLimpiezas: number;
+}
+
+export interface PremioCopa {
+    codigo: string;
+    zona: { nombre: string; barrio: string };
+    edicion: EdicionCopa;
+    venceEn: string;
+    canjeadoEn: string | null;
 }

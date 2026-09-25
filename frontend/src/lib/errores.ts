@@ -2,7 +2,7 @@ import { isAxiosError } from 'axios';
 
 // Los mensajes del backend ya están en español y no filtran detalles internos, pero igual solo se
 // muestran los de estados esperables; para el resto se usa un texto propio.
-const ESTADOS_CON_MENSAJE = new Set([400, 403, 404, 409, 413, 415, 422, 429, 503]);
+const ESTADOS_CON_MENSAJE = new Set([400, 403, 404, 409, 410, 413, 415, 422, 429, 503]);
 const PATRONES_SOSPECHOSOS = /prisma|sql|stack|exception|at \w+ \(/i;
 
 export const errorAmigable = (error: unknown, porDefecto: string): string => {

@@ -48,8 +48,9 @@ export const descartarDeCola = async (idCliente: string) => {
     avisarCambio();
 };
 
-// Pasados 30 días se olvidan (en el servidor ya se decidieron o se descartaron).
-const RECORDAR_PROPIOS_MS = 30 * 24 * 60 * 60 * 1000;
+// Se recuerdan 70 días: con ellos se pide el premio de la Copa, que se reclama hasta 30 días después
+// del cierre del mes (un reporte del día 1 necesita ~31 días del mes + 3 de revisión + 30 de canje).
+const RECORDAR_PROPIOS_MS = 70 * 24 * 60 * 60 * 1000;
 
 export const listarPropios = async () => {
     const bd = await abrirBase();

@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Link, NavLink, Outlet, useMatches, useNavigate } from 'react-router';
-import { ArrowLeft, BellRing, Camera, CloudUpload, House, Lightbulb, ListChecks, Map, MessageCircleHeart, Wifi, WifiOff } from 'lucide-react';
+import { ArrowLeft, BellRing, Camera, Trophy, CloudUpload, House, Lightbulb, ListChecks, Map, MessageCircleHeart, Wifi, WifiOff } from 'lucide-react';
 import { BotonEnlace } from '@/componentes/ui/Boton';
 import { useColaReportes } from '@/hooks/useColaReportes';
 import { useEnLinea } from '@/hooks/useEnLinea';
@@ -19,6 +19,7 @@ const NAVEGACION = [
 // En la computadora hay lugar para todas las secciones en la barra superior.
 const NAVEGACION_ESCRITORIO = [
     ...NAVEGACION,
+    { a: '/app/copa', texto: 'Copa', Icono: Trophy },
     { a: '/app/alertas', texto: 'Alertas', Icono: BellRing },
     { a: '/app/consejos', texto: 'Consejos', Icono: Lightbulb },
 ];

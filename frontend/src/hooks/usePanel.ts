@@ -218,3 +218,22 @@ export const useAuditoria = (filtros: RangoFechas & { usuarioId?: number; accion
     getNextPageParam: siguiente,
     placeholderData: keepPreviousData,
 });
+
+// ---------------------------------------------------------------------------
+// Copa Red-Cuidar
+// ---------------------------------------------------------------------------
+
+export const useRankingCopa = (localidadId: number | undefined, mes: string, habilitada = true) => useQuery({
+    queryKey: ['panel', 'copa', localidadId ?? null, mes],
+    queryFn: () => panelApi.rankingCopa(localidadId, mes),
+    enabled: habilitada,
+    placeholderData: keepPreviousData,
+});
+
+export const useCanjearPremio = () => {
+    const cliente = useQueryClient();
+    return useMutation({
+        mutationFn: (codigo: string) => panelApi.canjearPremio(codigo),
+        onSettled: () => cliente.invalidateQueries({ queryKey: ['panel', 'copa'] }),
+    });
+};

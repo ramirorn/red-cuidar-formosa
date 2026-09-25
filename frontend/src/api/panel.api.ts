@@ -22,6 +22,8 @@ import type {
     UsuarioActual,
     UsuarioInstitucional,
     EstadoRuta,
+    RankingCopa,
+    CanjeRealizado,
 } from '@/tipos/panel';
 import type { EstadoReporte } from '@/tipos';
 
@@ -122,6 +124,12 @@ export const panelApi = {
     crearUsuario: async (usuario: NuevoUsuario) => datos<UsuarioInstitucional>(await clientePanel.post('/institucional/usuarios', limpiar(usuario))),
     actualizarUsuario: async (id: number, cambios: CambiosUsuario) =>
         datos<UsuarioInstitucional>(await clientePanel.patch(`/institucional/usuarios/${id}`, cambios)),
+
+    // Copa Red-Cuidar
+    rankingCopa: async (localidadId: number | undefined, mes: string) =>
+        datos<RankingCopa>(await clientePanel.get('/institucional/copa', { params: limpiar({ localidadId, mes }) })),
+    canjearPremio: async (codigo: string) =>
+        datos<CanjeRealizado>(await clientePanel.post('/institucional/copa/canjes', { codigo })),
 
     // Auditoría
     auditoria: async (filtros: RangoFechas & { usuarioId?: number; accion?: string }, cursor?: string) =>
