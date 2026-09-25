@@ -32,6 +32,12 @@ docker compose exec api npm run semilla   # localidades, primer administrador y 
   intervenciones y premios de esa localidad). Otra localidad: `--localidad "Clorinda"` (o `--bbox sur,oeste,norte,este`);
   `--descargar` vuelve a bajar los datos. Sin ese archivo, la semilla carga una grilla sintética de 100 manzanas.
 
+- **Datos simulados para la demostración:** `docker compose exec api npm run simular-datos`. Carga dos meses de
+  reportes, limpiezas e intervenciones en cada manzana sin datos de Formosa Capital (≈55 % verde, 30 % amarillo,
+  15 % rojo, con barrios más cuidados que otros), 20 reportes pendientes para Epidemiología y el historial de colores
+  (llena el mapa, la Copa y las métricas). Se puede repetir: borra la simulación anterior y no toca datos reales.
+  Opciones: `--localidad "Clorinda"`, `--semilla 7`, `--pendientes 0`, `--borrar` (solo borra la simulación).
+  Correrlo después de `importar-osm`, que reemplaza las manzanas.
 - Flujos de n8n: `docker compose exec n8n sh /orquestador/importar.sh && docker compose restart n8n`
   (ver `orquestador/README.md`).
 - Web Push: generar las claves con `cd api && npm run generar-vapid` y cargarlas en `.env`.
