@@ -78,6 +78,7 @@ export default function Chat() {
                             )}>
                                 {mensaje.contenido}
                             </p>
+                            {mensaje.origen === 'basico' && <span className="mt-1 px-2 text-[0.7rem] text-gris-texto">Respuesta automática del asistente básico</span>}
                             {mensaje.nivelTriaje === 'URGENTE' && (
                                 <a href="tel:107" className="mt-2 flex items-center gap-3 rounded-2xl bg-rojo-500 px-4 py-3 font-extrabold text-white shadow-suave">
                                     <Phone className="size-5" aria-hidden />Llamar al 107

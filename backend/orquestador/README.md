@@ -56,6 +56,14 @@ reenvía el mensaje al webhook `chat-mosquito`, protegido con la cabecera `x-cla
 
 1. Arma la conversación: instrucciones del sistema, hasta 10 mensajes de historial y el mensaje nuevo.
 2. Llama a Ollama (`/api/chat`) exigiendo la salida en formato JSON `{ respuesta, nivelTriaje }`.
-3. Valida la salida. Si el modelo no respeta el formato o no responde, devuelve un mensaje de respaldo con
-   los signos de alarma. Ante URGENTE agrega la derivación a la guardia o al 107.
-4. Guarda **solo el nivel de triaje** en `triajeChat`. El texto de la conversación no se guarda.
+   Se pide `think: false`: los modelos que razonan (como nemotron) gastaban los tokens pensando y respondían vacío.
+3. Valida la salida (tolera `<think>`, bloques de código o texto plano). Ante URGENTE agrega la guardia o el 107.
+   Si no hay respuesta usable, devuelve el texto vacío y la API contesta con su **asistente básico**.
+
+La API guarda **solo el nivel de triaje** en `triajeChat` (el flujo ya no lo hace) y, si detecta un signo de
+alarma, fuerza URGENTE con el 107 aunque el modelo diga otra cosa. El texto de la conversación no se guarda.
+
+**Usar otro flujo (por ejemplo, el de otra compu):** pegar su Production URL en `URL_CHAT_ORQUESTADOR` del `.env`
+y reiniciar la API. El contrato (qué se envía y qué formatos de respuesta se aceptan) está en
+`api/src/integraciones/n8nChat.ts`. Se envían `mensaje` y `chatInput`, `sesionId` y `sessionId`, así funciona
+tanto con un Webhook como con un Chat Trigger o AI Agent.

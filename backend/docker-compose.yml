@@ -61,7 +61,7 @@ services:
       DIR_EVIDENCIAS: /datos/evidencias
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       URL_MOTOR_PREDICTIVO: http://motor-predictivo:8000
-      URL_CHAT_ORQUESTADOR: http://n8n:5678/webhook/chat-mosquito
+      URL_CHAT_ORQUESTADOR: ${URL_CHAT_ORQUESTADOR:-http://n8n:5678/webhook/chat-mosquito}
       VAPID_CLAVE_PUBLICA: ${VAPID_CLAVE_PUBLICA:-}
       VAPID_CLAVE_PRIVADA: ${VAPID_CLAVE_PRIVADA:-}
       VAPID_CONTACTO: ${VAPID_CONTACTO:-mailto:salud@redcuidar.local}

@@ -23,7 +23,7 @@ export const useChat = () => {
             const historial = mensajes.slice(-MENSAJES_DE_CONTEXTO).map(({ rol, contenido, firma }) => ({ rol, contenido, ...(firma ? { firma } : {}) }));
             await agregar({ rol: 'usuario', contenido: texto, fecha: new Date().toISOString() });
             const respuesta = await vecinoApi.enviarMensaje(texto, historial);
-            await agregar({ rol: 'asistente', contenido: respuesta.respuesta, firma: respuesta.firma, nivelTriaje: respuesta.nivelTriaje, fecha: new Date().toISOString() });
+            await agregar({ rol: 'asistente', contenido: respuesta.respuesta, firma: respuesta.firma, nivelTriaje: respuesta.nivelTriaje, ...(respuesta.origen ? { origen: respuesta.origen } : {}), fecha: new Date().toISOString() });
             return respuesta;
         },
     });

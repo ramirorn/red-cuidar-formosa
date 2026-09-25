@@ -461,15 +461,13 @@ paths:
                             type: [string, 'null']
                             enum: [SIN_RIESGO, LEVE, MODERADO, URGENTE, null]
                           firma: { type: string, description: Firma de la respuesta para reenviarla en el historial. }
+                          origen:
+                            type: string
+                            enum: [ia, basico]
+                            description: "ia: respondió el flujo de n8n. basico: el flujo no está configurado o no respondió y contestó el asistente básico de la API."
         '400': { $ref: '#/components/responses/SolicitudInvalida' }
         '401': { $ref: '#/components/responses/NoAutenticado' }
         '429': { $ref: '#/components/responses/DemasiadasSolicitudes' }
-        '502':
-          description: El asistente respondió con un error
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/Error' }
-        '503': { $ref: '#/components/responses/NoDisponible' }
 
   /suscripciones-push:
     post:

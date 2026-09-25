@@ -69,6 +69,8 @@ export interface RespuestaChat {
     respuesta: string;
     nivelTriaje: NivelTriaje | null;
     firma: string;
+    // 'basico': contestó el asistente sin modelo de lenguaje (el flujo de IA no respondió).
+    origen?: 'ia' | 'basico';
 }
 
 // ---------------------------------------------------------------------------

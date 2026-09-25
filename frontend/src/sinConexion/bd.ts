@@ -37,6 +37,7 @@ export interface MensajeGuardado {
     contenido: string;
     firma?: string;
     nivelTriaje?: NivelTriaje | null;
+    origen?: 'ia' | 'basico';
     fecha: string;
 }
 

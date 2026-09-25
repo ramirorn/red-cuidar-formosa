@@ -1,12 +1,12 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import type { NivelTriaje } from '@prisma/client';
 import entorno from '../config/entorno.js';
-import { ErrorHttp } from '../utils/errorHttp.js';
+import prisma from '../config/prisma.js';
+import { consultarFlujoN8n, flujoConfigurado, FlujoNoDisponible } from '../integraciones/n8nChat.js';
 import { crearSemaforo } from '../utils/semaforo.js';
+import { detectarTriaje, responderBasico } from './asistenteBasico.services.js';
 import { registrarActividadSesionService } from './sesion.services.js';
 
-// El LLM corre en CPU: se le da margen, pero sin dejar la conexión colgada indefinidamente.
-const TIEMPO_ESPERA_CHAT_MS = 90_000;
 const NIVELES: NivelTriaje[] = ['SIN_RIESGO', 'LEVE', 'MODERADO', 'URGENTE'];
 
 // Un único modelo local atiende a toda la provincia: pocas consultas a la vez y una fila corta.
@@ -38,42 +38,39 @@ export const filtrarHistorial = (sesionId: string, historial: MensajeHistorial[]
         .filter((mensaje) => mensaje.rol === 'usuario' || firmaValida(sesionId, mensaje))
         .map(({ rol, contenido }) => ({ rol, contenido }));
 
-// La API es la única puerta al orquestador: autentica la sesión, limita la tasa y reenvía
-// el mensaje a n8n por la red interna. El historial lo guarda la PWA en el dispositivo;
-// el servidor no persiste el contenido de la conversación.
-export const enviarMensajeChatService = (sesionId: string, mensaje: string, historial: MensajeHistorial[]) =>
-    conLugarEnElModelo(() => consultarAsistente(sesionId, mensaje, filtrarHistorial(sesionId, historial)));
+// La API es la única puerta al orquestador: autentica la sesión, limita la tasa y reenvía el mensaje
+// al flujo de n8n (src/integraciones/n8nChat.ts). Si el flujo no está configurado o no responde,
+// contesta el asistente básico. El historial lo guarda la PWA en el dispositivo; el servidor no
+// persiste el contenido de la conversación, solo el nivel de triaje (para las métricas).
+export const enviarMensajeChatService = async (sesionId: string, mensaje: string, historial: MensajeHistorial[]) => {
+    const conversacion = filtrarHistorial(sesionId, historial);
+    let resultado: { respuesta: string; nivelTriaje: NivelTriaje | null; origen: 'ia' | 'basico' } | null = null;
 
-const consultarAsistente = async (sesionId: string, mensaje: string, historial: MensajeHistorial[]) => {
-    let respuesta: Response;
-    try {
-        respuesta = await fetch(entorno.URL_CHAT_ORQUESTADOR, {
-            method: 'POST',
-            headers: { 'content-type': 'application/json', 'x-clave-servicio': entorno.CLAVE_SERVICIO_INTERNO },
-            body: JSON.stringify({ sesionId, mensaje, historial }),
-            signal: AbortSignal.timeout(TIEMPO_ESPERA_CHAT_MS),
-        });
-    } catch {
-        throw new ErrorHttp(503, 'El asistente no está disponible en este momento');
+    if (flujoConfigurado()) {
+        try {
+            const flujo = await conLugarEnElModelo(() => consultarFlujoN8n({ sesionId, mensaje, historial: conversacion }));
+            const nivel = NIVELES.includes(flujo.nivelTriaje as NivelTriaje) ? (flujo.nivelTriaje as NivelTriaje) : null;
+            resultado = { respuesta: flujo.respuesta.slice(0, 4000), nivelTriaje: nivel, origen: 'ia' };
+        } catch (error) {
+            // Flujo caído, sin respuesta o con la fila llena: el vecino igual recibe una respuesta útil.
+            const motivo = error instanceof FlujoNoDisponible ? error.message : error instanceof Error ? error.message : String(error);
+            console.warn(`Chat: el flujo de n8n no respondió (${motivo}); contesta el asistente básico`);
+        }
     }
+    resultado ??= { ...responderBasico(mensaje), origen: 'basico' };
 
-    if (!respuesta.ok) {
-        console.error(`El orquestador de chat respondió ${respuesta.status}`);
-        throw new ErrorHttp(502, 'El asistente no pudo responder');
-    }
-
-    const cuerpo = (await respuesta.json().catch(() => null)) as { respuesta?: unknown; nivelTriaje?: unknown } | null;
-    if (!cuerpo || typeof cuerpo.respuesta !== 'string' || cuerpo.respuesta.length === 0) {
-        throw new ErrorHttp(502, 'El asistente no pudo responder');
+    // Red de seguridad: un signo de alarma siempre termina en URGENTE con el 107, diga lo que diga el modelo.
+    if (detectarTriaje(mensaje) === 'URGENTE' && resultado.nivelTriaje !== 'URGENTE') {
+        resultado.nivelTriaje = 'URGENTE';
+        if (!resultado.respuesta.includes('107')) resultado.respuesta += '\n\nLo que contás puede ser un signo de alarma: andá ya a la guardia más cercana o llamá al 107.';
     }
 
     await registrarActividadSesionService(sesionId);
+    if (resultado.nivelTriaje) await prisma.triajeChat.create({ data: { sesionId, nivel: resultado.nivelTriaje } });
 
-    const texto = cuerpo.respuesta.slice(0, 4000);
     return {
-        respuesta: texto,
-        nivelTriaje: NIVELES.includes(cuerpo.nivelTriaje as NivelTriaje) ? (cuerpo.nivelTriaje as NivelTriaje) : null,
+        ...resultado,
         // La PWA la guarda junto a la respuesta y la reenvía en el historial.
-        firma: firmarRespuesta(sesionId, texto),
+        firma: firmarRespuesta(sesionId, resultado.respuesta),
     };
 };
